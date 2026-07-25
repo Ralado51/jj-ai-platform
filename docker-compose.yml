@@ -37,8 +37,6 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     ports:
       - "${API_PORT}:8000"
-    volumes:
-      - ./apps/api/app:/app/app
     depends_on:
       postgres:
         condition: service_healthy
