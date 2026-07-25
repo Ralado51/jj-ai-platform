@@ -37,11 +37,20 @@ services:
       DATABASE_URL: ${DATABASE_URL}
     ports:
       - "${API_PORT}:8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=portainer_default"
+      - "traefik.http.routers.jj-ai-api.rule=Host(`api.jjnetwork.com.br`)"
+      - "traefik.http.routers.jj-ai-api.entrypoints=websecure"
+      - "traefik.http.routers.jj-ai-api.tls=true"
+      - "traefik.http.routers.jj-ai-api.tls.certresolver=leresolver"
+      - "traefik.http.services.jj-ai-api.loadbalancer.server.port=8000"
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - jj-ai-network
+      - portainer_default
 
 volumes:
   jj_ai_postgres_data:
@@ -49,3 +58,5 @@ volumes:
 networks:
   jj-ai-network:
     driver: bridge
+  portainer_default:
+    external: true
