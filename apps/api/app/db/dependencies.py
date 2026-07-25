@@ -6,9 +6,10 @@ from app.db.session import SessionLocal
 
 
 def get_db() -> Generator[Session, None, None]:
-    database = SessionLocal()
+    """Provide a SQLAlchemy session for FastAPI dependencies."""
 
+    db = SessionLocal()
     try:
-        yield database
+        yield db
     finally:
-        database.close()
+        db.close()
