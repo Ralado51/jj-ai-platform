@@ -3,6 +3,7 @@ from app.models.asset import Asset
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
 from app.models.execution import Execution
+from app.models.memory import Memory
 from app.models.project import Project
 from app.models.task import Task
 
@@ -13,6 +14,7 @@ __all__ = [
     "Base",
     "Execution",
     "ExecutionStatus",
+    "Memory",
     "MemoryType",
     "Project",
     "Task",
