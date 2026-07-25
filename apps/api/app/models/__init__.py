@@ -6,6 +6,7 @@ from app.models.execution import Execution
 from app.models.memory import Memory
 from app.models.project import Project
 from app.models.task import Task
+from app.models.user import User, UserRole
 
 __all__ = [
     "Agent",
@@ -21,4 +22,6 @@ __all__ = [
     "TaskType",
     "TimestampMixin",
     "UUIDPrimaryKeyMixin",
+    "User",
+    "UserRole",
 ]
