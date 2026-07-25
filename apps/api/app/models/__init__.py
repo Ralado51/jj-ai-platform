@@ -1,6 +1,7 @@
 from app.models.agent import Agent
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
+from app.models.execution import Execution
 from app.models.project import Project
 from app.models.task import Task
 
@@ -8,6 +9,7 @@ __all__ = [
     "Agent",
     "AssetType",
     "Base",
+    "Execution",
     "ExecutionStatus",
     "MemoryType",
     "Project",
