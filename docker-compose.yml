@@ -36,7 +36,7 @@ services:
       ENVIRONMENT: ${ENVIRONMENT}
       DATABASE_URL: ${DATABASE_URL}
     ports:
-      - "${API_PORT}:8002"
+      - "${API_PORT}:8000"
     depends_on:
       postgres:
         condition: service_healthy
