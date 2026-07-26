@@ -16,7 +16,7 @@ class ProjectService:
         if self.repository.get_by_slug(data.slug):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="A project with this slug already exists.",
+                detail="Já existe um projeto com este slug.",
             )
         try:
             return self.repository.create(data)
@@ -24,18 +24,30 @@ class ProjectService:
             self.repository.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Project could not be created because a unique value already exists.",
+                detail="Não foi possível criar o projeto porque um valor único já existe.",
             ) from exc
 
-    def list(self, *, offset: int = 0, limit: int = 100) -> list[Project]:
-        return self.repository.list(offset=offset, limit=limit)
+    def list(
+        self,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+        is_active: bool | None = True,
+        search: str | None = None,
+    ) -> list[Project]:
+        return self.repository.list(
+            offset=offset,
+            limit=limit,
+            is_active=is_active,
+            search=search,
+        )
 
     def get(self, project_id: UUID) -> Project:
         project = self.repository.get_by_id(project_id)
         if project is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Project not found.",
+                detail="Projeto não encontrado.",
             )
         return project
 
@@ -46,7 +58,7 @@ class ProjectService:
             if existing is not None and existing.id != project_id:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="A project with this slug already exists.",
+                    detail="Já existe um projeto com este slug.",
                 )
         try:
             return self.repository.update(project, data)
@@ -54,9 +66,11 @@ class ProjectService:
             self.repository.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Project could not be updated because a unique value already exists.",
+                detail="Não foi possível atualizar o projeto porque um valor único já existe.",
             ) from exc
 
-    def delete(self, project_id: UUID) -> None:
+    def archive(self, project_id: UUID) -> Project:
         project = self.get(project_id)
-        self.repository.delete(project)
+        if not project.is_active:
+            return project
+        return self.repository.archive(project)
