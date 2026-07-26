@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -30,12 +30,22 @@ def create_project(
 def list_projects(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=100),
+    is_active: bool | None = Query(
+        default=True,
+        description="Use true para ativos, false para arquivados ou omita com valor nulo para todos.",
+    ),
+    search: str | None = Query(default=None, min_length=1, max_length=150),
     service: ProjectService = Depends(get_service),
     _: User = Depends(
         require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
     ),
 ) -> list[ProjectResponse]:
-    return service.list(offset=offset, limit=limit)
+    return service.list(
+        offset=offset,
+        limit=limit,
+        is_active=is_active,
+        search=search,
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectResponse)
@@ -49,7 +59,7 @@ def get_project(
     return service.get(project_id)
 
 
-@router.put("/{project_id}", response_model=ProjectResponse)
+@router.patch("/{project_id}", response_model=ProjectResponse)
 def update_project(
     project_id: UUID,
     payload: ProjectUpdate,
@@ -59,11 +69,10 @@ def update_project(
     return service.update(project_id, payload)
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_project(
+@router.delete("/{project_id}", response_model=ProjectResponse)
+def archive_project(
     project_id: UUID,
     service: ProjectService = Depends(get_service),
     _: User = Depends(require_roles(UserRole.ADMIN)),
-) -> Response:
-    service.delete(project_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+) -> ProjectResponse:
+    return service.archive(project_id)
