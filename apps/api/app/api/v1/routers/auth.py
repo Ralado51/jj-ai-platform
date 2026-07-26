@@ -4,7 +4,15 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import get_current_user
 from app.db.dependencies import get_db
 from app.models.user import User
-from app.schemas.auth import LoginRequest, TokenResponse, UserCreate, UserResponse
+from app.schemas.auth import (
+    ForgotPasswordRequest,
+    LoginRequest,
+    MessageResponse,
+    ResetPasswordRequest,
+    TokenResponse,
+    UserCreate,
+    UserResponse,
+)
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -28,6 +36,26 @@ def login(
     service: AuthService = Depends(get_service),
 ) -> TokenResponse:
     return service.login(payload)
+
+
+@router.post("/forgot-password", response_model=MessageResponse)
+def forgot_password(
+    payload: ForgotPasswordRequest,
+    service: AuthService = Depends(get_service),
+) -> MessageResponse:
+    service.forgot_password(payload)
+    return MessageResponse(
+        message="Se o e-mail estiver cadastrado, enviaremos as instruções de recuperação."
+    )
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+def reset_password(
+    payload: ResetPasswordRequest,
+    service: AuthService = Depends(get_service),
+) -> MessageResponse:
+    service.reset_password(payload)
+    return MessageResponse(message="Senha redefinida com sucesso.")
 
 
 @router.get("/me", response_model=UserResponse)
