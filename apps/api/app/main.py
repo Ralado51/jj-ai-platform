@@ -1,10 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.db.session import engine
+from app.services.storage import StorageError, get_storage_service
 
 settings = get_settings()
 
@@ -54,4 +55,21 @@ def database_health() -> dict[str, str]:
     return {
         "status": "ok",
         "database": "connected",
+    }
+
+
+@app.get("/health/storage", tags=["system"])
+def storage_health() -> dict[str, str]:
+    try:
+        get_storage_service().check_connection()
+    except StorageError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Object storage is unavailable.",
+        ) from exc
+
+    return {
+        "status": "ok",
+        "storage": "connected",
+        "bucket": settings.s3_bucket,
     }
