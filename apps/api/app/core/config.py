@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_use_ssl: bool = True
 
+    s3_endpoint_url: str = "http://minio:9000"
+    s3_access_key: str = ""
+    s3_secret_key: str = ""
+    s3_bucket: str = "jj-ai-projects"
+    s3_region: str = "us-east-1"
+    s3_use_ssl: bool = False
+    s3_presigned_url_expire_seconds: int = 900
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
