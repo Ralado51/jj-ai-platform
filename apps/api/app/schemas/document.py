@@ -24,3 +24,17 @@ class DocumentResponse(BaseModel):
     asset_metadata: dict[str, Any]
     created_at: datetime
     updated_at: datetime
+
+
+class DocumentListResponse(BaseModel):
+    items: list[DocumentResponse]
+    total: int
+    offset: int
+    limit: int
+
+
+class DocumentDownloadResponse(BaseModel):
+    document_id: UUID
+    filename: str
+    url: str
+    expires_in: int
