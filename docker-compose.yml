@@ -47,11 +47,13 @@ services:
       - "traefik.http.routers.jj-ai-minio-console.entrypoints=websecure"
       - "traefik.http.routers.jj-ai-minio-console.tls=true"
       - "traefik.http.routers.jj-ai-minio-console.tls.certresolver=leresolver"
+      - "traefik.http.routers.jj-ai-minio-console.service=jj-ai-minio-console"
       - "traefik.http.services.jj-ai-minio-console.loadbalancer.server.port=9001"
       - "traefik.http.routers.jj-ai-minio-api.rule=Host(`${MINIO_API_DOMAIN}`)"
       - "traefik.http.routers.jj-ai-minio-api.entrypoints=websecure"
       - "traefik.http.routers.jj-ai-minio-api.tls=true"
       - "traefik.http.routers.jj-ai-minio-api.tls.certresolver=leresolver"
+      - "traefik.http.routers.jj-ai-minio-api.service=jj-ai-minio-api"
       - "traefik.http.services.jj-ai-minio-api.loadbalancer.server.port=9000"
     networks:
       - jj-ai-network
