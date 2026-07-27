@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     smtp_use_ssl: bool = True
 
     s3_endpoint_url: str = "http://minio:9000"
+    s3_public_endpoint_url: str = "https://s3.jjnetwork.com.br"
     s3_access_key: str = ""
     s3_secret_key: str = ""
     s3_bucket: str = "jj-ai-projects"
