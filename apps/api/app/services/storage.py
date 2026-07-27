@@ -19,6 +19,8 @@ class StorageService:
     def __init__(self, settings: Settings) -> None:
         self.bucket = settings.s3_bucket
         self.presigned_url_expire_seconds = settings.s3_presigned_url_expire_seconds
+        client_config = Config(signature_version="s3v4", s3={"addressing_style": "path"})
+
         self.client: BaseClient = boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint_url,
@@ -26,7 +28,18 @@ class StorageService:
             aws_secret_access_key=settings.s3_secret_key,
             region_name=settings.s3_region,
             use_ssl=settings.s3_use_ssl,
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            config=client_config,
+        )
+
+        public_endpoint = settings.s3_public_endpoint_url.rstrip("/")
+        self.public_client: BaseClient = boto3.client(
+            "s3",
+            endpoint_url=public_endpoint,
+            aws_access_key_id=settings.s3_access_key,
+            aws_secret_access_key=settings.s3_secret_key,
+            region_name=settings.s3_region,
+            use_ssl=public_endpoint.startswith("https://"),
+            config=client_config,
         )
 
     def check_connection(self) -> None:
@@ -114,7 +127,7 @@ class StorageService:
             )
 
         try:
-            return self.client.generate_presigned_url(
+            return self.public_client.generate_presigned_url(
                 "get_object",
                 Params=params,
                 ExpiresIn=expires_in or self.presigned_url_expire_seconds,
