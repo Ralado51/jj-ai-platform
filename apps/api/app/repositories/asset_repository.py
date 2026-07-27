@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.asset import Asset
@@ -17,7 +17,13 @@ class AssetRepository:
         self.db.refresh(asset)
         return asset
 
-    def list_documents_by_project(self, project_id: UUID) -> list[Asset]:
+    def list_documents_by_project(
+        self,
+        project_id: UUID,
+        *,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[Asset]:
         statement = (
             select(Asset)
             .where(
@@ -25,8 +31,17 @@ class AssetRepository:
                 Asset.asset_type == AssetType.DOCUMENT,
             )
             .order_by(Asset.created_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
         return list(self.db.scalars(statement).all())
+
+    def count_documents_by_project(self, project_id: UUID) -> int:
+        statement = select(func.count(Asset.id)).where(
+            Asset.project_id == project_id,
+            Asset.asset_type == AssetType.DOCUMENT,
+        )
+        return int(self.db.scalar(statement) or 0)
 
     def get_document(self, document_id: UUID) -> Asset | None:
         statement = select(Asset).where(
@@ -38,3 +53,7 @@ class AssetRepository:
     def delete(self, asset: Asset) -> None:
         self.db.delete(asset)
         self.db.commit()
+
+    def flush_delete(self, asset: Asset) -> None:
+        self.db.delete(asset)
+        self.db.flush()
