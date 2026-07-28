@@ -27,9 +27,38 @@ ALLOWED_DOCUMENT_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     "application/vnd.ms-powerpoint",
     "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
     "text/csv",
     "text/markdown",
     "text/plain",
+}
+
+MIME_TYPE_BY_EXTENSION = {
+    ".csv": "text/csv",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".gif": "image/gif",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".json": "application/json",
+    ".md": "text/markdown",
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    ".txt": "text/plain",
+    ".webp": "image/webp",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+GENERIC_UPLOAD_MIME_TYPES = {
+    "application/octet-stream",
+    "application/x-zip-compressed",
+    "binary/octet-stream",
 }
 
 
@@ -48,8 +77,17 @@ class DocumentService:
         self._get_project(project_id, require_active=True)
 
         filename = Path(file.filename or "documento").name
-        content_type = file.content_type or "application/octet-stream"
-        if content_type not in ALLOWED_DOCUMENT_MIME_TYPES:
+        extension = Path(filename).suffix.lower()
+        reported_content_type = (file.content_type or "application/octet-stream").lower()
+        expected_content_type = MIME_TYPE_BY_EXTENSION.get(extension)
+
+        if reported_content_type in ALLOWED_DOCUMENT_MIME_TYPES:
+            content_type = reported_content_type
+        elif expected_content_type and reported_content_type in GENERIC_UPLOAD_MIME_TYPES:
+            # Some browsers and operating systems send Office files as a generic
+            # binary/ZIP MIME type. Normalize them using the approved extension.
+            content_type = expected_content_type
+        else:
             raise HTTPException(
                 status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
                 detail="Tipo de arquivo não permitido.",
