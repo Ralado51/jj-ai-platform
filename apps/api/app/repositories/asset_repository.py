@@ -17,6 +17,12 @@ class AssetRepository:
         self.db.refresh(asset)
         return asset
 
+    def save(self, asset: Asset) -> Asset:
+        self.db.add(asset)
+        self.db.commit()
+        self.db.refresh(asset)
+        return asset
+
     def list_documents_by_project(
         self,
         project_id: UUID,

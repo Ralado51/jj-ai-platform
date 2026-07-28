@@ -11,6 +11,7 @@ from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
     DocumentDownloadResponse,
     DocumentListResponse,
+    DocumentProcessResponse,
     DocumentResponse,
 )
 from app.services.document_service import DocumentService
@@ -70,6 +71,18 @@ def get_document(
     ),
 ) -> DocumentResponse:
     return service.get(document_id)
+
+
+@documents_router.post(
+    "/{document_id}/process",
+    response_model=DocumentProcessResponse,
+)
+def process_document(
+    document_id: UUID,
+    service: DocumentService = Depends(get_service),
+    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> DocumentProcessResponse:
+    return service.process(document_id)
 
 
 @documents_router.get(

@@ -38,3 +38,11 @@ class DocumentDownloadResponse(BaseModel):
     filename: str
     url: str
     expires_in: int
+
+
+class DocumentProcessResponse(BaseModel):
+    document_id: UUID
+    status: str
+    extracted_text_path: str | None = None
+    character_count: int = 0
+    message: str
