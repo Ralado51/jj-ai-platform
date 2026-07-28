@@ -1,7 +1,7 @@
 """add document chunks with pgvector embedding
 
 Revision ID: 20260728_01
-Revises: None
+Revises: f4a1c2d3e4b5
 Create Date: 2026-07-28
 """
 
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from pgvector.sqlalchemy import Vector
 
 revision: str = "20260728_01"
-down_revision: str | None = None
+down_revision: str | None = "f4a1c2d3e4b5"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
