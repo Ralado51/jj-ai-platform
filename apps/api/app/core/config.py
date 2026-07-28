@@ -34,6 +34,12 @@ class Settings(BaseSettings):
     s3_use_ssl: bool = False
     s3_presigned_url_expire_seconds: int = 900
 
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    openai_embedding_model: str = "text-embedding-3-small"
+    openai_embedding_dimensions: int = 1536
+    openai_timeout_seconds: float = 60.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
