@@ -11,6 +11,12 @@ from app.core.config import get_settings
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.schemas.document import DocumentEmbeddingResponse
+from app.services.embedding_providers import (
+    EmbeddingProvider,
+    EmbeddingProviderError,
+    OllamaEmbeddingProvider,
+    OpenAIEmbeddingProvider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,24 +46,31 @@ class EmbeddingService:
                 detail="O documento precisa ser processado antes da geração de embeddings.",
             )
 
-        if not self.settings.openai_api_key:
+        try:
+            provider = self._get_provider()
+        except EmbeddingProviderError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="A integração de embeddings não está configurada.",
-            )
+                detail="A integração de embeddings não está configurada corretamente.",
+            ) from exc
 
         metadata = dict(document.asset_metadata or {})
         metadata["embedding_status"] = "processing"
+        metadata["embedding_provider"] = provider.name
         metadata.pop("embedding_error", None)
         document.asset_metadata = metadata
         self.asset_repository.save(document)
 
         try:
-            embeddings = self._create_embeddings([chunk.content for chunk in chunks])
+            embeddings = provider.create_embeddings([chunk.content for chunk in chunks])
             self.chunk_repository.update_embeddings(chunks=chunks, embeddings=embeddings)
-        except (httpx.HTTPError, ValueError, SQLAlchemyError) as exc:
+        except (httpx.HTTPError, EmbeddingProviderError, ValueError, SQLAlchemyError) as exc:
             self.asset_repository.db.rollback()
-            logger.exception("Failed to generate embeddings for document %s", document_id)
+            logger.exception(
+                "Failed to generate embeddings for document %s using provider %s",
+                document_id,
+                provider.name,
+            )
             metadata = dict(document.asset_metadata or {})
             metadata["embedding_status"] = "failed"
             metadata["embedding_error"] = str(exc)
@@ -72,8 +85,9 @@ class EmbeddingService:
         metadata.update(
             {
                 "embedding_status": "completed",
-                "embedding_model": self.settings.openai_embedding_model,
-                "embedding_dimensions": self.settings.openai_embedding_dimensions,
+                "embedding_provider": provider.name,
+                "embedding_model": provider.model,
+                "embedding_dimensions": provider.dimensions,
                 "embedded_chunk_count": len(chunks),
             }
         )
@@ -84,34 +98,30 @@ class EmbeddingService:
         return DocumentEmbeddingResponse(
             document_id=document.id,
             status="completed",
-            model=self.settings.openai_embedding_model,
-            dimensions=self.settings.openai_embedding_dimensions,
+            provider=provider.name,
+            model=provider.model,
+            dimensions=provider.dimensions,
             embedded_chunk_count=len(chunks),
             message="Embeddings gerados e armazenados com sucesso.",
         )
 
-    def _create_embeddings(self, inputs: list[str]) -> list[list[float]]:
-        response = httpx.post(
-            f"{self.settings.openai_base_url.rstrip('/')}/embeddings",
-            headers={
-                "Authorization": f"Bearer {self.settings.openai_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": self.settings.openai_embedding_model,
-                "input": inputs,
-                "dimensions": self.settings.openai_embedding_dimensions,
-                "encoding_format": "float",
-            },
-            timeout=self.settings.openai_timeout_seconds,
+    def _get_provider(self) -> EmbeddingProvider:
+        provider_name = self.settings.embedding_provider.strip().lower()
+        if provider_name == "ollama":
+            return OllamaEmbeddingProvider(
+                base_url=self.settings.ollama_base_url,
+                model=self.settings.ollama_embedding_model,
+                dimensions=self.settings.ollama_embedding_dimensions,
+                timeout_seconds=self.settings.ollama_timeout_seconds,
+            )
+        if provider_name == "openai":
+            return OpenAIEmbeddingProvider(
+                api_key=self.settings.openai_api_key,
+                base_url=self.settings.openai_base_url,
+                model=self.settings.openai_embedding_model,
+                dimensions=self.settings.openai_embedding_dimensions,
+                timeout_seconds=self.settings.openai_timeout_seconds,
+            )
+        raise EmbeddingProviderError(
+            f"Unsupported embedding provider: {self.settings.embedding_provider}"
         )
-        response.raise_for_status()
-        payload = response.json()
-        data = sorted(payload.get("data", []), key=lambda item: item["index"])
-        embeddings = [item["embedding"] for item in data]
-
-        if len(embeddings) != len(inputs):
-            raise ValueError("Embedding response count does not match chunk count")
-        if any(len(embedding) != self.settings.openai_embedding_dimensions for embedding in embeddings):
-            raise ValueError("Embedding response dimensions do not match configuration")
-        return embeddings
