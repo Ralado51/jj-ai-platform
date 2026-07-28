@@ -49,6 +49,15 @@ class DocumentProcessResponse(BaseModel):
     message: str
 
 
+class DocumentEmbeddingResponse(BaseModel):
+    document_id: UUID
+    status: str
+    model: str
+    dimensions: int
+    embedded_chunk_count: int
+    message: str
+
+
 class DocumentChunkResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

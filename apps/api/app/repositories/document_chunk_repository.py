@@ -43,3 +43,15 @@ class DocumentChunkRepository:
             .order_by(DocumentChunk.chunk_index.asc())
         )
         return list(self.db.scalars(statement).all())
+
+    def update_embeddings(
+        self,
+        *,
+        chunks: list[DocumentChunk],
+        embeddings: list[list[float]],
+    ) -> None:
+        if len(chunks) != len(embeddings):
+            raise ValueError("Chunk and embedding counts must match")
+        for chunk, embedding in zip(chunks, embeddings, strict=True):
+            chunk.embedding = embedding
+        self.db.commit()

@@ -11,11 +11,13 @@ from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
     DocumentChunkResponse,
     DocumentDownloadResponse,
+    DocumentEmbeddingResponse,
     DocumentListResponse,
     DocumentProcessResponse,
     DocumentResponse,
 )
 from app.services.document_service import DocumentService
+from app.services.embedding_service import EmbeddingService
 from app.services.storage import StorageService, get_storage_service
 
 project_documents_router = APIRouter(
@@ -34,6 +36,10 @@ def get_service(
         project_repository=ProjectRepository(db),
         storage=storage,
     )
+
+
+def get_embedding_service(db: Session = Depends(get_db)) -> EmbeddingService:
+    return EmbeddingService(asset_repository=AssetRepository(db))
 
 
 @project_documents_router.post(
@@ -84,6 +90,18 @@ def process_document(
     _: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
 ) -> DocumentProcessResponse:
     return service.process(document_id)
+
+
+@documents_router.post(
+    "/{document_id}/embeddings",
+    response_model=DocumentEmbeddingResponse,
+)
+def generate_document_embeddings(
+    document_id: UUID,
+    service: EmbeddingService = Depends(get_embedding_service),
+    _: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> DocumentEmbeddingResponse:
+    return service.embed_document(document_id)
 
 
 @documents_router.get(
