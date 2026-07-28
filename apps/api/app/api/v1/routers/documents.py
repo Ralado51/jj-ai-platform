@@ -9,6 +9,7 @@ from app.models.user import User, UserRole
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
+    DocumentChunkResponse,
     DocumentDownloadResponse,
     DocumentListResponse,
     DocumentProcessResponse,
@@ -83,6 +84,20 @@ def process_document(
     _: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
 ) -> DocumentProcessResponse:
     return service.process(document_id)
+
+
+@documents_router.get(
+    "/{document_id}/chunks",
+    response_model=list[DocumentChunkResponse],
+)
+def list_document_chunks(
+    document_id: UUID,
+    service: DocumentService = Depends(get_service),
+    _: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> list[DocumentChunkResponse]:
+    return service.list_chunks(document_id)
 
 
 @documents_router.get(

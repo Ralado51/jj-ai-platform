@@ -45,4 +45,18 @@ class DocumentProcessResponse(BaseModel):
     status: str
     extracted_text_path: str | None = None
     character_count: int = 0
+    chunk_count: int = 0
     message: str
+
+
+class DocumentChunkResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    document_id: UUID
+    project_id: UUID
+    chunk_index: int
+    content: str
+    character_count: int
+    created_at: datetime
+    updated_at: datetime

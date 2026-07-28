@@ -1,6 +1,7 @@
 from app.models.agent import Agent
 from app.models.asset import Asset
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+from app.models.document_chunk import DocumentChunk
 from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
 from app.models.execution import Execution
 from app.models.memory import Memory
@@ -13,6 +14,7 @@ __all__ = [
     "Asset",
     "AssetType",
     "Base",
+    "DocumentChunk",
     "Execution",
     "ExecutionStatus",
     "Memory",
