@@ -13,8 +13,10 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.models.asset import Asset
 from app.models.enums import AssetType
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
+    DocumentChunkResponse,
     DocumentDownloadResponse,
     DocumentListResponse,
     DocumentProcessResponse,
@@ -25,6 +27,7 @@ from app.services.document_extractor import (
     SUPPORTED_EXTRACTION_MIME_TYPES,
 )
 from app.services.storage import StorageError, StorageService
+from app.services.text_chunker import TextChunker
 
 MAX_DOCUMENT_SIZE_BYTES = 25 * 1024 * 1024
 ALLOWED_DOCUMENT_MIME_TYPES = {
@@ -77,12 +80,16 @@ class DocumentService:
         asset_repository: AssetRepository,
         project_repository: ProjectRepository,
         storage: StorageService,
+        chunk_repository: DocumentChunkRepository | None = None,
         extractor: DocumentExtractor | None = None,
+        chunker: TextChunker | None = None,
     ) -> None:
         self.asset_repository = asset_repository
         self.project_repository = project_repository
         self.storage = storage
+        self.chunk_repository = chunk_repository or DocumentChunkRepository(asset_repository.db)
         self.extractor = extractor or DocumentExtractor()
+        self.chunker = chunker or TextChunker()
 
     def upload(self, project_id: UUID, file: UploadFile) -> Asset:
         self._get_project(project_id, require_active=True)
@@ -227,6 +234,10 @@ class DocumentService:
             if not extracted_text:
                 raise DocumentExtractionError("No extractable text found.")
 
+            chunks = self.chunker.split(extracted_text)
+            if not chunks:
+                raise DocumentExtractionError("No chunks were generated.")
+
             extracted_text_path = f"{document.storage_path}.extracted.txt"
             self.storage.upload_file(
                 file_obj=BytesIO(extracted_text.encode("utf-8")),
@@ -237,7 +248,13 @@ class DocumentService:
                     "source-sha256": document.checksum or "",
                 },
             )
-        except (StorageError, DocumentExtractionError) as exc:
+            chunk_records = self.chunk_repository.replace_for_document(
+                document_id=document.id,
+                project_id=document.project_id,
+                chunks=chunks,
+            )
+        except (StorageError, DocumentExtractionError, SQLAlchemyError) as exc:
+            self.asset_repository.db.rollback()
             metadata = dict(document.asset_metadata or {})
             metadata["processing_status"] = "failed"
             metadata["processing_error"] = str(exc)
@@ -245,15 +262,17 @@ class DocumentService:
             self.asset_repository.save(document)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="Não foi possível extrair texto deste documento.",
+                detail="Não foi possível extrair e dividir o texto deste documento.",
             ) from exc
 
         metadata = dict(document.asset_metadata or {})
         metadata.update(
             {
-                "processing_status": "processed",
+                "processing_status": "chunked",
                 "extracted_text_path": extracted_text_path,
                 "character_count": len(extracted_text),
+                "chunk_count": len(chunk_records),
+                "embedding_status": "pending",
             }
         )
         metadata.pop("processing_error", None)
@@ -262,11 +281,19 @@ class DocumentService:
 
         return DocumentProcessResponse(
             document_id=document.id,
-            status="processed",
+            status="chunked",
             extracted_text_path=extracted_text_path,
             character_count=len(extracted_text),
-            message="Texto extraído e armazenado com sucesso.",
+            chunk_count=len(chunk_records),
+            message="Texto extraído e dividido em chunks com sucesso.",
         )
+
+    def list_chunks(self, document_id: UUID) -> list[DocumentChunkResponse]:
+        self.get(document_id)
+        return [
+            DocumentChunkResponse.model_validate(chunk)
+            for chunk in self.chunk_repository.list_for_document(document_id)
+        ]
 
     def get_download(self, document_id: UUID) -> DocumentDownloadResponse:
         document = self.get(document_id)
