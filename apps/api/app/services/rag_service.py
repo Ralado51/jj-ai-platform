@@ -8,6 +8,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import get_settings
+from app.repositories.asset_repository import AssetRepository
 from app.schemas.search import (
     RagAnswerRequest,
     RagAnswerResponse,
@@ -21,8 +22,14 @@ logger = logging.getLogger(__name__)
 
 
 class RagService:
-    def __init__(self, *, search_service: SemanticSearchService) -> None:
+    def __init__(
+        self,
+        *,
+        search_service: SemanticSearchService,
+        asset_repository: AssetRepository,
+    ) -> None:
         self.search_service = search_service
+        self.asset_repository = asset_repository
         self.settings = get_settings()
 
     def answer(self, project_id: UUID, data: RagAnswerRequest) -> RagAnswerResponse:
@@ -89,6 +96,9 @@ class RagService:
             ) from exc
 
         answer = self._ensure_inline_citations(answer, len(selected_results))
+        document_names = self.asset_repository.get_document_names(
+            list({result.document_id for result in selected_results})
+        )
 
         return RagAnswerResponse(
             project_id=project_id,
@@ -102,8 +112,10 @@ class RagService:
                 RagSource(
                     chunk_id=result.chunk_id,
                     document_id=result.document_id,
+                    document_name=document_names.get(result.document_id, "Documento sem nome"),
                     chunk_index=result.chunk_index,
                     score=result.score,
+                    snippet=self._build_snippet(result.content),
                 )
                 for result in selected_results
             ],
@@ -141,6 +153,13 @@ class RagService:
                 break
 
         return selected_results, "\n\n".join(context_parts)
+
+    @staticmethod
+    def _build_snippet(content: str, max_characters: int = 280) -> str:
+        compact = " ".join(content.split())
+        if len(compact) <= max_characters:
+            return compact
+        return f"{compact[: max_characters - 1].rstrip()}…"
 
     @staticmethod
     def _ensure_inline_citations(answer: str, source_count: int) -> str:
