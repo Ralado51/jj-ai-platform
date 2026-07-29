@@ -40,6 +40,15 @@ class RagSource(BaseModel):
     score: float
 
 
+class RagExecutionMetrics(BaseModel):
+    confidence: float
+    retrieved_chunks: int
+    context_size: int
+    search_time_ms: int
+    generation_time_ms: int
+    total_time_ms: int
+
+
 class RagAnswerResponse(BaseModel):
     project_id: UUID
     question: str
@@ -48,4 +57,5 @@ class RagAnswerResponse(BaseModel):
     chat_model: str
     embedding_provider: str
     embedding_model: str
+    metrics: RagExecutionMetrics
     sources: list[RagSource]
