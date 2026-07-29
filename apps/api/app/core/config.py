@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     ollama_chat_timeout_seconds: float = 180.0
     ollama_chat_temperature: float = 0.2
 
+    rag_retrieval_top_k: int = 10
+    rag_max_context_characters: int = 5000
+
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_embedding_model: str = "text-embedding-3-small"
