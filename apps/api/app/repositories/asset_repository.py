@@ -56,6 +56,16 @@ class AssetRepository:
         )
         return self.db.scalar(statement)
 
+    def get_document_names(self, document_ids: list[UUID]) -> dict[UUID, str]:
+        if not document_ids:
+            return {}
+
+        statement = select(Asset.id, Asset.name).where(
+            Asset.id.in_(document_ids),
+            Asset.asset_type == AssetType.DOCUMENT,
+        )
+        return {document_id: name for document_id, name in self.db.execute(statement).all()}
+
     def delete(self, asset: Asset) -> None:
         self.db.delete(asset)
         self.db.commit()
