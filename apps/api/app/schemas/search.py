@@ -25,3 +25,27 @@ class SemanticSearchResponse(BaseModel):
     model: str
     total: int
     results: list[SemanticSearchResult]
+
+
+class RagAnswerRequest(BaseModel):
+    question: str = Field(min_length=2, max_length=2000)
+    top_k: int = Field(default=5, ge=1, le=10)
+    min_score: float = Field(default=0.2, ge=0.0, le=1.0)
+
+
+class RagSource(BaseModel):
+    chunk_id: UUID
+    document_id: UUID
+    chunk_index: int
+    score: float
+
+
+class RagAnswerResponse(BaseModel):
+    project_id: UUID
+    question: str
+    answer: str
+    chat_provider: str
+    chat_model: str
+    embedding_provider: str
+    embedding_model: str
+    sources: list[RagSource]
