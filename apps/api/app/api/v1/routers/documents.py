@@ -65,13 +65,17 @@ def get_search_service(db: Session = Depends(get_db)) -> SemanticSearchService:
 
 
 def get_rag_service(db: Session = Depends(get_db)) -> RagService:
-    embedding_service = EmbeddingService(asset_repository=AssetRepository(db))
+    asset_repository = AssetRepository(db)
+    embedding_service = EmbeddingService(asset_repository=asset_repository)
     search_service = SemanticSearchService(
         project_repository=ProjectRepository(db),
         chunk_repository=DocumentChunkRepository(db),
         embedding_service=embedding_service,
     )
-    return RagService(search_service=search_service)
+    return RagService(
+        search_service=search_service,
+        asset_repository=asset_repository,
+    )
 
 
 @project_documents_router.post(
