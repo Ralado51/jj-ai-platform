@@ -52,6 +52,7 @@ class DocumentProcessResponse(BaseModel):
 class DocumentEmbeddingResponse(BaseModel):
     document_id: UUID
     status: str
+    provider: str
     model: str
     dimensions: int
     embedded_chunk_count: int

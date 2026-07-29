@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     s3_use_ssl: bool = False
     s3_presigned_url_expire_seconds: int = 900
 
+    embedding_provider: str = "ollama"
+
+    ollama_base_url: str = "http://ollama:11434"
+    ollama_embedding_model: str = "nomic-embed-text"
+    ollama_embedding_dimensions: int = 768
+    ollama_timeout_seconds: float = 120.0
+
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
     openai_embedding_model: str = "text-embedding-3-small"
