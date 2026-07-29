@@ -7,6 +7,7 @@ from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
     DocumentChunkResponse,
@@ -16,13 +17,19 @@ from app.schemas.document import (
     DocumentProcessResponse,
     DocumentResponse,
 )
+from app.schemas.search import SemanticSearchRequest, SemanticSearchResponse
 from app.services.document_service import DocumentService
 from app.services.embedding_service import EmbeddingService
+from app.services.search_service import SemanticSearchService
 from app.services.storage import StorageService, get_storage_service
 
 project_documents_router = APIRouter(
     prefix="/projects/{project_id}/documents",
     tags=["documents"],
+)
+project_search_router = APIRouter(
+    prefix="/projects/{project_id}",
+    tags=["search"],
 )
 documents_router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -40,6 +47,15 @@ def get_service(
 
 def get_embedding_service(db: Session = Depends(get_db)) -> EmbeddingService:
     return EmbeddingService(asset_repository=AssetRepository(db))
+
+
+def get_search_service(db: Session = Depends(get_db)) -> SemanticSearchService:
+    embedding_service = EmbeddingService(asset_repository=AssetRepository(db))
+    return SemanticSearchService(
+        project_repository=ProjectRepository(db),
+        chunk_repository=DocumentChunkRepository(db),
+        embedding_service=embedding_service,
+    )
 
 
 @project_documents_router.post(
@@ -67,6 +83,18 @@ def list_documents(
     ),
 ) -> DocumentListResponse:
     return service.list(project_id, offset=offset, limit=limit)
+
+
+@project_search_router.post("/search", response_model=SemanticSearchResponse)
+def semantic_search(
+    project_id: UUID,
+    data: SemanticSearchRequest,
+    service: SemanticSearchService = Depends(get_search_service),
+    _: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> SemanticSearchResponse:
+    return service.search(project_id, data)
 
 
 @documents_router.get("/{document_id}", response_model=DocumentResponse)

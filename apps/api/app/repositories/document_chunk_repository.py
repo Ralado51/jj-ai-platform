@@ -55,3 +55,26 @@ class DocumentChunkRepository:
         for chunk, embedding in zip(chunks, embeddings, strict=True):
             chunk.embedding = embedding
         self.db.commit()
+
+    def semantic_search(
+        self,
+        *,
+        project_id: UUID,
+        query_embedding: list[float],
+        limit: int,
+    ) -> list[tuple[DocumentChunk, float]]:
+        distance = DocumentChunk.embedding.cosine_distance(query_embedding)
+        statement = (
+            select(DocumentChunk, distance.label("distance"))
+            .where(
+                DocumentChunk.project_id == project_id,
+                DocumentChunk.embedding.is_not(None),
+            )
+            .order_by(distance.asc())
+            .limit(limit)
+        )
+        rows = self.db.execute(statement).all()
+        return [
+            (chunk, max(0.0, min(1.0, 1.0 - float(value))))
+            for chunk, value in rows
+        ]
