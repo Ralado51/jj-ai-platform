@@ -17,9 +17,15 @@ from app.schemas.document import (
     DocumentProcessResponse,
     DocumentResponse,
 )
-from app.schemas.search import SemanticSearchRequest, SemanticSearchResponse
+from app.schemas.search import (
+    RagAnswerRequest,
+    RagAnswerResponse,
+    SemanticSearchRequest,
+    SemanticSearchResponse,
+)
 from app.services.document_service import DocumentService
 from app.services.embedding_service import EmbeddingService
+from app.services.rag_service import RagService
 from app.services.search_service import SemanticSearchService
 from app.services.storage import StorageService, get_storage_service
 
@@ -56,6 +62,16 @@ def get_search_service(db: Session = Depends(get_db)) -> SemanticSearchService:
         chunk_repository=DocumentChunkRepository(db),
         embedding_service=embedding_service,
     )
+
+
+def get_rag_service(db: Session = Depends(get_db)) -> RagService:
+    embedding_service = EmbeddingService(asset_repository=AssetRepository(db))
+    search_service = SemanticSearchService(
+        project_repository=ProjectRepository(db),
+        chunk_repository=DocumentChunkRepository(db),
+        embedding_service=embedding_service,
+    )
+    return RagService(search_service=search_service)
 
 
 @project_documents_router.post(
@@ -95,6 +111,18 @@ def semantic_search(
     ),
 ) -> SemanticSearchResponse:
     return service.search(project_id, data)
+
+
+@project_search_router.post("/ask", response_model=RagAnswerResponse)
+def ask_project(
+    project_id: UUID,
+    data: RagAnswerRequest,
+    service: RagService = Depends(get_rag_service),
+    _: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> RagAnswerResponse:
+    return service.answer(project_id, data)
 
 
 @documents_router.get("/{document_id}", response_model=DocumentResponse)

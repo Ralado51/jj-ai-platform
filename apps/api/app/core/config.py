@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     ollama_embedding_model: str = "nomic-embed-text"
     ollama_embedding_dimensions: int = 768
     ollama_timeout_seconds: float = 120.0
+    ollama_chat_model: str = "qwen2.5:3b"
+    ollama_chat_timeout_seconds: float = 180.0
+    ollama_chat_temperature: float = 0.2
 
     openai_api_key: str = ""
     openai_base_url: str = "https://api.openai.com/v1"
