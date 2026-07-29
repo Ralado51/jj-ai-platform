@@ -47,7 +47,7 @@ class EmbeddingService:
             )
 
         try:
-            provider = self._get_provider()
+            provider = self.get_provider()
         except EmbeddingProviderError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -105,7 +105,7 @@ class EmbeddingService:
             message="Embeddings gerados e armazenados com sucesso.",
         )
 
-    def _get_provider(self) -> EmbeddingProvider:
+    def get_provider(self) -> EmbeddingProvider:
         provider_name = self.settings.embedding_provider.strip().lower()
         if provider_name == "ollama":
             return OllamaEmbeddingProvider(
