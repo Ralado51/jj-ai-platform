@@ -1,7 +1,7 @@
 """add persistent conversations
 
 Revision ID: 20260730_01
-Revises: 
+Revises: 20260728_03
 Create Date: 2026-07-30 10:55:00
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = "20260730_01"
-down_revision = None
+down_revision = "20260728_03"
 branch_labels = None
 depends_on = None
 
@@ -44,12 +44,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["conversation_id"], ["conversations.id"], ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_conversation_messages_conversation_id"),
-        "conversation_messages",
-        ["conversation_id"],
-        unique=False,
-    )
+    op.create_index(op.f("ix_conversation_messages_conversation_id"), "conversation_messages", ["conversation_id"], unique=False)
 
 
 def downgrade() -> None:
