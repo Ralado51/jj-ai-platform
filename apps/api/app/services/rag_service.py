@@ -111,7 +111,6 @@ class RagService:
         answer = self._normalize_inline_citations(answer, len(selected_results))
         confidence = self._calculate_confidence(selected_results)
         total_time_ms = self._elapsed_ms(total_started_at)
-        answer = self._ensure_inline_citations(answer, len(selected_results))
         document_names = self.asset_repository.get_document_names(
             list({result.document_id for result in selected_results})
         )
@@ -136,7 +135,10 @@ class RagService:
                 RagSource(
                     chunk_id=result.chunk_id,
                     document_id=result.document_id,
-                    document_name=document_names.get(result.document_id, "Documento sem nome"),
+                    document_name=document_names.get(
+                        result.document_id,
+                        "Documento sem nome",
+                    ),
                     chunk_index=result.chunk_index,
                     score=result.score,
                     snippet=self._build_snippet(result.content),
@@ -179,15 +181,14 @@ class RagService:
         return selected_results, "\n\n".join(context_parts)
 
     @staticmethod
-  def _build_snippet(content: str, max_characters: int = 280) -> str:
-          compact = " ".join(content.split())
-          if len(compact) <= max_characters:
-              return compact
-          return f"{compact[: max_characters - 1].rstrip()}…"
-    def _normalize_inline_citations(answer: str, source_count: int) -> str:
-    
+    def _build_snippet(content: str, max_characters: int = 280) -> str:
+        compact = " ".join(content.split())
+        if len(compact) <= max_characters:
+            return compact
+        return f"{compact[: max_characters - 1].rstrip()}…"
+
     @staticmethod
-    def _ensure_inline_citations(answer: str, source_count: int) -> str:
+    def _normalize_inline_citations(answer: str, source_count: int) -> str:
         cleaned = answer.strip()
         if not cleaned or cleaned.startswith("Não encontrei essa informação"):
             return cleaned
@@ -201,6 +202,7 @@ class RagService:
                 if normalized_lines and normalized_lines[-1] != "":
                     normalized_lines.append("")
                 continue
+
             if citation_only.fullmatch(line) and normalized_lines:
                 previous_index = len(normalized_lines) - 1
                 while previous_index >= 0 and not normalized_lines[previous_index]:
@@ -210,13 +212,16 @@ class RagService:
                         f"{normalized_lines[previous_index].rstrip()} {line}"
                     )
                     continue
+
             normalized_lines.append(line)
 
         normalized = "\n".join(normalized_lines).strip()
         citations = [
             int(value)
             for value in re.findall(
-                r"\[Fonte\s+(\d+)\]", normalized, flags=re.IGNORECASE
+                r"\[Fonte\s+(\d+)\]",
+                normalized,
+                flags=re.IGNORECASE,
             )
         ]
         valid_citations = [value for value in citations if 1 <= value <= source_count]
