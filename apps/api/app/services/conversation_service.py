@@ -33,17 +33,34 @@ class ConversationService:
         )
         return ConversationResponse.model_validate(conversation)
 
-    def list(self, project_id: UUID, user_id: UUID) -> ConversationListResponse:
+    def list(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        *,
+        query: str | None = None,
+        favorites_only: bool = False,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> ConversationListResponse:
         self._ensure_project(project_id)
         items = self.conversation_repository.list_for_project(
             project_id=project_id,
             user_id=user_id,
+            query=query,
+            favorites_only=favorites_only,
+            offset=offset,
+            limit=limit,
         )
         return ConversationListResponse(
             total=self.conversation_repository.count_for_project(
                 project_id=project_id,
                 user_id=user_id,
+                query=query,
+                favorites_only=favorites_only,
             ),
+            offset=offset,
+            limit=limit,
             items=items,
         )
 
