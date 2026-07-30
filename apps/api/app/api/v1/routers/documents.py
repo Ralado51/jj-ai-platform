@@ -9,6 +9,7 @@ from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.repositories.project_repository import ProjectRepository
 from app.schemas.document import (
@@ -77,6 +78,7 @@ def get_rag_service(db: Session = Depends(get_db)) -> RagService:
     return RagService(
         search_service=search_service,
         asset_repository=asset_repository,
+        conversation_repository=ConversationRepository(db),
     )
 
 
@@ -124,11 +126,11 @@ def ask_project(
     project_id: UUID,
     data: RagAnswerRequest,
     service: RagService = Depends(get_rag_service),
-    _: User = Depends(
+    user: User = Depends(
         require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
     ),
 ) -> RagAnswerResponse:
-    return service.answer(project_id, data)
+    return service.answer(project_id, user.id, data)
 
 
 @project_search_router.post("/ask/stream")
@@ -136,11 +138,11 @@ def stream_project_answer(
     project_id: UUID,
     data: RagAnswerRequest,
     service: RagService = Depends(get_rag_service),
-    _: User = Depends(
+    user: User = Depends(
         require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
     ),
 ) -> StreamingResponse:
-    events = service.stream_answer(project_id, data)
+    events = service.stream_answer(project_id, user.id, data)
 
     def encode_events():
         for event in events:
