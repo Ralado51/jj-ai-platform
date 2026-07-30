@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -47,10 +47,21 @@ def create_conversation(
 )
 def list_conversations(
     project_id: UUID,
+    query: str | None = Query(default=None, min_length=1, max_length=200),
+    favorites_only: bool = Query(default=False),
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100),
     service: ConversationService = Depends(get_service),
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> ConversationListResponse:
-    return service.list(project_id, user.id)
+    return service.list(
+        project_id,
+        user.id,
+        query=query,
+        favorites_only=favorites_only,
+        offset=offset,
+        limit=limit,
+    )
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
