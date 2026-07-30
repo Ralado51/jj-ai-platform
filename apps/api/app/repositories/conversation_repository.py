@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.conversation import Conversation, ConversationMessage
@@ -17,22 +17,46 @@ class ConversationRepository:
         self.db.refresh(conversation)
         return conversation
 
-    def list_for_project(self, *, project_id: UUID, user_id: UUID) -> list[Conversation]:
+    def list_for_project(
+        self,
+        *,
+        project_id: UUID,
+        user_id: UUID,
+        query: str | None = None,
+        favorites_only: bool = False,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[Conversation]:
+        filters = self._build_filters(
+            project_id=project_id,
+            user_id=user_id,
+            query=query,
+            favorites_only=favorites_only,
+        )
         statement = (
             select(Conversation)
-            .where(
-                Conversation.project_id == project_id,
-                Conversation.user_id == user_id,
-            )
+            .where(*filters)
             .order_by(Conversation.is_favorite.desc(), Conversation.updated_at.desc())
+            .offset(offset)
+            .limit(limit)
         )
         return list(self.db.scalars(statement).all())
 
-    def count_for_project(self, *, project_id: UUID, user_id: UUID) -> int:
-        statement = select(func.count(Conversation.id)).where(
-            Conversation.project_id == project_id,
-            Conversation.user_id == user_id,
+    def count_for_project(
+        self,
+        *,
+        project_id: UUID,
+        user_id: UUID,
+        query: str | None = None,
+        favorites_only: bool = False,
+    ) -> int:
+        filters = self._build_filters(
+            project_id=project_id,
+            user_id=user_id,
+            query=query,
+            favorites_only=favorites_only,
         )
+        statement = select(func.count(Conversation.id)).where(*filters)
         return int(self.db.scalar(statement) or 0)
 
     def get(self, *, conversation_id: UUID, user_id: UUID) -> Conversation | None:
@@ -113,3 +137,35 @@ class ConversationRepository:
         self.db.refresh(message)
         self.db.refresh(conversation)
         return message
+
+    @staticmethod
+    def _build_filters(
+        *,
+        project_id: UUID,
+        user_id: UUID,
+        query: str | None,
+        favorites_only: bool,
+    ) -> list:
+        filters: list = [
+            Conversation.project_id == project_id,
+            Conversation.user_id == user_id,
+        ]
+        if favorites_only:
+            filters.append(Conversation.is_favorite.is_(True))
+
+        normalized_query = (query or "").strip()
+        if normalized_query:
+            pattern = f"%{normalized_query}%"
+            message_match = exists(
+                select(ConversationMessage.id).where(
+                    ConversationMessage.conversation_id == Conversation.id,
+                    ConversationMessage.content.ilike(pattern),
+                )
+            )
+            filters.append(
+                or_(
+                    Conversation.title.ilike(pattern),
+                    message_match,
+                )
+            )
+        return filters
