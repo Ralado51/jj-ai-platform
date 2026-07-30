@@ -1,6 +1,8 @@
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
@@ -127,6 +129,31 @@ def ask_project(
     ),
 ) -> RagAnswerResponse:
     return service.answer(project_id, data)
+
+
+@project_search_router.post("/ask/stream")
+def stream_project_answer(
+    project_id: UUID,
+    data: RagAnswerRequest,
+    service: RagService = Depends(get_rag_service),
+    _: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> StreamingResponse:
+    events = service.stream_answer(project_id, data)
+
+    def encode_events():
+        for event in events:
+            yield json.dumps(event, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(
+        encode_events(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @documents_router.get("/{document_id}", response_model=DocumentResponse)

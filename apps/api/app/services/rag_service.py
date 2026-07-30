@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+from collections.abc import Iterator
 from time import perf_counter
 from uuid import UUID
 
@@ -36,8 +37,116 @@ class RagService:
 
     def answer(self, project_id: UUID, data: RagAnswerRequest) -> RagAnswerResponse:
         total_started_at = perf_counter()
-        retrieval_limit = max(data.top_k, self.settings.rag_retrieval_top_k)
+        prepared = self._prepare_answer(project_id, data)
+        provider = prepared["provider"]
+        selected_results = prepared["selected_results"]
 
+        generation_started_at = perf_counter()
+        try:
+            answer = provider.generate(
+                system_prompt=prepared["system_prompt"],
+                user_prompt=prepared["user_prompt"],
+            )
+        except (httpx.HTTPError, ChatProviderError) as exc:
+            logger.exception(
+                "Failed to generate RAG answer for project %s using model %s",
+                project_id,
+                provider.model,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Não foi possível gerar a resposta com o modelo local.",
+            ) from exc
+
+        generation_time_ms = self._elapsed_ms(generation_started_at)
+        answer = self._normalize_inline_citations(answer, len(selected_results))
+        metrics = self._build_metrics(
+            selected_results=selected_results,
+            context=prepared["context"],
+            search_time_ms=prepared["search_time_ms"],
+            generation_time_ms=generation_time_ms,
+            total_started_at=total_started_at,
+        )
+
+        return RagAnswerResponse(
+            project_id=project_id,
+            question=data.question,
+            answer=answer,
+            chat_provider=provider.name,
+            chat_model=provider.model,
+            embedding_provider=prepared["search_response"].provider,
+            embedding_model=prepared["search_response"].model,
+            metrics=metrics,
+            sources=prepared["sources"],
+        )
+
+    def stream_answer(
+        self,
+        project_id: UUID,
+        data: RagAnswerRequest,
+    ) -> Iterator[dict]:
+        total_started_at = perf_counter()
+        prepared = self._prepare_answer(project_id, data)
+        provider = prepared["provider"]
+        selected_results = prepared["selected_results"]
+
+        metadata = {
+            "type": "metadata",
+            "project_id": str(project_id),
+            "question": data.question,
+            "chat_provider": provider.name,
+            "chat_model": provider.model,
+            "embedding_provider": prepared["search_response"].provider,
+            "embedding_model": prepared["search_response"].model,
+            "sources": [source.model_dump(mode="json") for source in prepared["sources"]],
+        }
+
+        def event_stream() -> Iterator[dict]:
+            yield metadata
+            generation_started_at = perf_counter()
+            answer_parts: list[str] = []
+
+            try:
+                for token in provider.stream_generate(
+                    system_prompt=prepared["system_prompt"],
+                    user_prompt=prepared["user_prompt"],
+                ):
+                    answer_parts.append(token)
+                    yield {"type": "token", "content": token}
+            except (httpx.HTTPError, ChatProviderError) as exc:
+                logger.exception(
+                    "Failed to stream RAG answer for project %s using model %s",
+                    project_id,
+                    provider.model,
+                )
+                yield {
+                    "type": "error",
+                    "detail": "Não foi possível gerar a resposta com o modelo local.",
+                }
+                return
+
+            generation_time_ms = self._elapsed_ms(generation_started_at)
+            answer = self._normalize_inline_citations(
+                "".join(answer_parts),
+                len(selected_results),
+            )
+            metrics = self._build_metrics(
+                selected_results=selected_results,
+                context=prepared["context"],
+                search_time_ms=prepared["search_time_ms"],
+                generation_time_ms=generation_time_ms,
+                total_started_at=total_started_at,
+            )
+            yield {
+                "type": "done",
+                "answer": answer,
+                "metrics": metrics.model_dump(mode="json"),
+            }
+
+        return event_stream()
+
+    def _prepare_answer(self, project_id: UUID, data: RagAnswerRequest) -> dict:
+        retrieval_limit = max(data.top_k, self.settings.rag_retrieval_top_k)
         search_started_at = perf_counter()
         search_response = self.search_service.search(
             project_id,
@@ -68,6 +177,38 @@ class RagService:
             timeout_seconds=self.settings.ollama_chat_timeout_seconds,
             temperature=self.settings.ollama_chat_temperature,
         )
+        system_prompt, user_prompt = self._build_prompts(context, data.question)
+        document_names = self.asset_repository.get_document_names(
+            list({result.document_id for result in selected_results})
+        )
+        sources = [
+            RagSource(
+                chunk_id=result.chunk_id,
+                document_id=result.document_id,
+                document_name=document_names.get(
+                    result.document_id,
+                    "Documento sem nome",
+                ),
+                chunk_index=result.chunk_index,
+                score=result.score,
+                snippet=self._build_snippet(result.content),
+            )
+            for result in selected_results
+        ]
+
+        return {
+            "provider": provider,
+            "selected_results": selected_results,
+            "context": context,
+            "search_response": search_response,
+            "search_time_ms": search_time_ms,
+            "system_prompt": system_prompt,
+            "user_prompt": user_prompt,
+            "sources": sources,
+        }
+
+    @staticmethod
+    def _build_prompts(context: str, question: str) -> tuple[str, str]:
         system_prompt = (
             "Você é o assistente de RAG da JJ AI Platform. "
             "Responda em português do Brasil exclusivamente com informações presentes no contexto. "
@@ -85,66 +226,28 @@ class RagService:
         )
         user_prompt = (
             f"CONTEXTO DE REFERÊNCIA\n{context}\n\n"
-            f"PERGUNTA DO USUÁRIO\n{data.question}\n\n"
+            f"PERGUNTA DO USUÁRIO\n{question}\n\n"
             "Responda rigorosamente segundo as regras. Preserve siglas e termos técnicos exatamente "
             "como aparecem no contexto e mantenha cada citação junto da afirmação que ela fundamenta."
         )
+        return system_prompt, user_prompt
 
-        generation_started_at = perf_counter()
-        try:
-            answer = provider.generate(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-            )
-        except (httpx.HTTPError, ChatProviderError) as exc:
-            logger.exception(
-                "Failed to generate RAG answer for project %s using model %s",
-                project_id,
-                provider.model,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Não foi possível gerar a resposta com o modelo local.",
-            ) from exc
-        generation_time_ms = self._elapsed_ms(generation_started_at)
-
-        answer = self._normalize_inline_citations(answer, len(selected_results))
-        confidence = self._calculate_confidence(selected_results)
-        total_time_ms = self._elapsed_ms(total_started_at)
-        document_names = self.asset_repository.get_document_names(
-            list({result.document_id for result in selected_results})
-        )
-
-        return RagAnswerResponse(
-            project_id=project_id,
-            question=data.question,
-            answer=answer,
-            chat_provider=provider.name,
-            chat_model=provider.model,
-            embedding_provider=search_response.provider,
-            embedding_model=search_response.model,
-            metrics=RagExecutionMetrics(
-                confidence=confidence,
-                retrieved_chunks=len(selected_results),
-                context_size=len(context),
-                search_time_ms=search_time_ms,
-                generation_time_ms=generation_time_ms,
-                total_time_ms=total_time_ms,
-            ),
-            sources=[
-                RagSource(
-                    chunk_id=result.chunk_id,
-                    document_id=result.document_id,
-                    document_name=document_names.get(
-                        result.document_id,
-                        "Documento sem nome",
-                    ),
-                    chunk_index=result.chunk_index,
-                    score=result.score,
-                    snippet=self._build_snippet(result.content),
-                )
-                for result in selected_results
-            ],
+    def _build_metrics(
+        self,
+        *,
+        selected_results: list,
+        context: str,
+        search_time_ms: int,
+        generation_time_ms: int,
+        total_started_at: float,
+    ) -> RagExecutionMetrics:
+        return RagExecutionMetrics(
+            confidence=self._calculate_confidence(selected_results),
+            retrieved_chunks=len(selected_results),
+            context_size=len(context),
+            search_time_ms=search_time_ms,
+            generation_time_ms=generation_time_ms,
+            total_time_ms=self._elapsed_ms(total_started_at),
         )
 
     def _build_context(self, results: list) -> tuple[list, str]:
