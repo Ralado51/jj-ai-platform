@@ -8,11 +8,13 @@ from app.api.v1.routers.documents import (
     project_search_router,
 )
 from app.api.v1.routers.projects import router as projects_router
+from app.api.v1.routers.prompt_templates import router as prompt_templates_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
 api_router.include_router(projects_router)
 api_router.include_router(conversations_router)
+api_router.include_router(prompt_templates_router)
 api_router.include_router(project_documents_router)
 api_router.include_router(project_search_router)
 api_router.include_router(documents_router)
