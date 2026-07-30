@@ -7,6 +7,7 @@ from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
 from app.models.execution import Execution
 from app.models.memory import Memory
 from app.models.project import Project
+from app.models.prompt_template import PromptTemplate
 from app.models.task import Task
 from app.models.user import User, UserRole
 
@@ -23,6 +24,7 @@ __all__ = [
     "Memory",
     "MemoryType",
     "Project",
+    "PromptTemplate",
     "Task",
     "TaskType",
     "TimestampMixin",
