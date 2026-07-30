@@ -54,3 +54,7 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         back_populates="project",
         cascade="all, delete-orphan",
     )
+    conversations: Mapped[list["Conversation"]] = relationship(
+        back_populates="project",
+        cascade="all, delete-orphan",
+    )
