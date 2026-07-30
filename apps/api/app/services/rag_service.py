@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 
 from app.core.config import get_settings
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.search import (
     RagAnswerRequest,
     RagAnswerResponse,
@@ -30,14 +31,21 @@ class RagService:
         *,
         search_service: SemanticSearchService,
         asset_repository: AssetRepository,
+        conversation_repository: ConversationRepository,
     ) -> None:
         self.search_service = search_service
         self.asset_repository = asset_repository
+        self.conversation_repository = conversation_repository
         self.settings = get_settings()
 
-    def answer(self, project_id: UUID, data: RagAnswerRequest) -> RagAnswerResponse:
+    def answer(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        data: RagAnswerRequest,
+    ) -> RagAnswerResponse:
         total_started_at = perf_counter()
-        prepared = self._prepare_answer(project_id, data)
+        prepared = self._prepare_answer(project_id, user_id, data)
         provider = prepared["provider"]
         selected_results = prepared["selected_results"]
 
@@ -83,10 +91,11 @@ class RagService:
     def stream_answer(
         self,
         project_id: UUID,
+        user_id: UUID,
         data: RagAnswerRequest,
     ) -> Iterator[dict]:
         total_started_at = perf_counter()
-        prepared = self._prepare_answer(project_id, data)
+        prepared = self._prepare_answer(project_id, user_id, data)
         provider = prepared["provider"]
         selected_results = prepared["selected_results"]
 
@@ -145,7 +154,12 @@ class RagService:
 
         return event_stream()
 
-    def _prepare_answer(self, project_id: UUID, data: RagAnswerRequest) -> dict:
+    def _prepare_answer(
+        self,
+        project_id: UUID,
+        user_id: UUID,
+        data: RagAnswerRequest,
+    ) -> dict:
         retrieval_limit = max(data.top_k, self.settings.rag_retrieval_top_k)
         search_started_at = perf_counter()
         search_response = self.search_service.search(
@@ -171,13 +185,23 @@ class RagService:
                 detail="Os trechos encontrados excederam o limite de contexto disponível.",
             )
 
+        conversation_history = self._load_conversation_history(
+            project_id=project_id,
+            user_id=user_id,
+            conversation_id=data.conversation_id,
+        )
+
         provider = OllamaChatProvider(
             base_url=self.settings.ollama_base_url,
             model=self.settings.ollama_chat_model,
             timeout_seconds=self.settings.ollama_chat_timeout_seconds,
             temperature=self.settings.ollama_chat_temperature,
         )
-        system_prompt, user_prompt = self._build_prompts(context, data.question)
+        system_prompt, user_prompt = self._build_prompts(
+            context,
+            data.question,
+            conversation_history,
+        )
         document_names = self.asset_repository.get_document_names(
             list({result.document_id for result in selected_results})
         )
@@ -207,8 +231,44 @@ class RagService:
             "sources": sources,
         }
 
+    def _load_conversation_history(
+        self,
+        *,
+        project_id: UUID,
+        user_id: UUID,
+        conversation_id: UUID | None,
+    ) -> str:
+        if conversation_id is None:
+            return ""
+
+        conversation = self.conversation_repository.get_for_project(
+            conversation_id=conversation_id,
+            project_id=project_id,
+            user_id=user_id,
+        )
+        if conversation is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversa não encontrada neste projeto.",
+            )
+
+        messages = conversation.messages[-12:]
+        return "\n".join(
+            f"{self._role_label(message.role)}: {message.content.strip()}"
+            for message in messages
+            if message.content.strip()
+        )
+
     @staticmethod
-    def _build_prompts(context: str, question: str) -> tuple[str, str]:
+    def _role_label(role: str) -> str:
+        return "Usuário" if role == "user" else "Assistente"
+
+    @staticmethod
+    def _build_prompts(
+        context: str,
+        question: str,
+        conversation_history: str = "",
+    ) -> tuple[str, str]:
         system_prompt = (
             "Você é o assistente de RAG da JJ AI Platform. "
             "Responda em português do Brasil exclusivamente com informações presentes no contexto. "
@@ -222,9 +282,17 @@ class RagService:
             "suficiente, sem simplificar excessivamente. Toda afirmação factual deve terminar com uma "
             "ou mais citações válidas no formato [Fonte N]. A citação deve ficar na mesma linha e logo "
             "após a afirmação correspondente. Não coloque citações isoladas em uma linha e não crie uma "
-            "seção de referências. Use somente números de fontes presentes no contexto."
+            "seção de referências. Use somente números de fontes presentes no contexto. "
+            "O histórico da conversa serve apenas para resolver referências e continuidade do diálogo; "
+            "ele não substitui as fontes documentais e não deve ser citado como evidência."
+        )
+        history_block = (
+            f"HISTÓRICO RECENTE DA CONVERSA\n{conversation_history}\n\n"
+            if conversation_history
+            else ""
         )
         user_prompt = (
+            f"{history_block}"
             f"CONTEXTO DE REFERÊNCIA\n{context}\n\n"
             f"PERGUNTA DO USUÁRIO\n{question}\n\n"
             "Responda rigorosamente segundo as regras. Preserve siglas e termos técnicos exatamente "
