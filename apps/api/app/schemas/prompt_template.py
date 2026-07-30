@@ -43,15 +43,20 @@ class PromptTemplateUpdate(BaseModel):
     metadata: dict[str, Any] | None = None
 
 
-class PromptTemplateResponse(PromptTemplateBase):
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+class PromptTemplateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID
     project_id: UUID | None
     owner_id: UUID | None
+    name: str
+    description: str | None
+    category: str
+    content: str
+    variables: list[str]
+    is_public: bool
+    is_favorite: bool
+    is_active: bool
+    metadata_: dict[str, Any] = Field(default_factory=dict, serialization_alias="metadata")
     created_at: datetime
     updated_at: datetime
-
-    @property
-    def metadata(self) -> dict[str, Any]:
-        return self.metadata_
