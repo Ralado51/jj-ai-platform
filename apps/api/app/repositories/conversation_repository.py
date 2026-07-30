@@ -46,6 +46,41 @@ class ConversationRepository:
         )
         return self.db.scalar(statement)
 
+    def get_for_project(
+        self,
+        *,
+        conversation_id: UUID,
+        project_id: UUID,
+        user_id: UUID,
+    ) -> Conversation | None:
+        statement = (
+            select(Conversation)
+            .options(selectinload(Conversation.messages))
+            .where(
+                Conversation.id == conversation_id,
+                Conversation.project_id == project_id,
+                Conversation.user_id == user_id,
+            )
+        )
+        return self.db.scalar(statement)
+
+    def recent_messages(
+        self,
+        *,
+        conversation_id: UUID,
+        project_id: UUID,
+        user_id: UUID,
+        limit: int = 12,
+    ) -> list[ConversationMessage]:
+        conversation = self.get_for_project(
+            conversation_id=conversation_id,
+            project_id=project_id,
+            user_id=user_id,
+        )
+        if conversation is None:
+            return []
+        return conversation.messages[-limit:]
+
     def update(self, conversation: Conversation, *, title: str | None, is_favorite: bool | None) -> Conversation:
         if title is not None:
             conversation.title = title
