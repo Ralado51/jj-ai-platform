@@ -31,6 +31,7 @@ class RagAnswerRequest(BaseModel):
     question: str = Field(min_length=2, max_length=2000)
     top_k: int = Field(default=5, ge=1, le=10)
     min_score: float = Field(default=0.2, ge=0.0, le=1.0)
+    conversation_id: UUID | None = None
 
 
 class RagSource(BaseModel):
