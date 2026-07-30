@@ -56,4 +56,6 @@ class ConversationListItem(BaseModel):
 
 class ConversationListResponse(BaseModel):
     total: int
+    offset: int = 0
+    limit: int = 50
     items: list[ConversationListItem]
