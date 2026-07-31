@@ -265,6 +265,19 @@ class RagService:
     def _role_label(role: str) -> str:
         return "Usuário" if role == "user" else "Assistente"
 
+    @staticmethod
+    def _build_prompts(
+        context: str,
+        question: str,
+        conversation_history: str = "",
+    ) -> tuple[str, str]:
+        prompt = PromptEngine().build_rag_prompt(
+            context=context,
+            question=question,
+            conversation_history=conversation_history,
+        )
+        return prompt.system_prompt, prompt.user_prompt
+
     def _build_metrics(
         self,
         *,
