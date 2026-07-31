@@ -9,8 +9,38 @@ class PromptBuildResult:
     user_prompt: str
 
 
+class PromptOptimizer:
+    """Applies reusable quality rules to prompts built for small local models."""
+
+    CONTENT_RULES = (
+        "REGRAS DE OTIMIZAÇÃO\n"
+        "1. Comece com um gancho que provoque curiosidade, tensão ou contraste.\n"
+        "2. Evite frases genéricas, burocráticas ou excessivamente explicativas.\n"
+        "3. Use verbos de ação e linguagem natural, como um criador experiente da plataforma.\n"
+        "4. Mostre pelo menos um exemplo concreto em vez de apenas definir o conceito.\n"
+        "5. Garanta que cada trecho do roteiro tenha função clara: gancho, explicação, exemplo e CTA.\n"
+        "6. Não repita palavras-chave entre título, legenda e CTA quando houver alternativa natural.\n"
+        "7. Preserve precisão técnica sem transformar o conteúdo em aula longa.\n"
+        "8. Prefira frases curtas, faláveis e com ritmo adequado a vídeo curto.\n"
+    )
+
+    def optimize_content_prompt(self, prompt: PromptBuildResult) -> PromptBuildResult:
+        optimized_system = (
+            f"{prompt.system_prompt} "
+            "Você também deve maximizar retenção, clareza e naturalidade sem inventar fatos."
+        )
+        optimized_user = f"{prompt.user_prompt}\n{self.CONTENT_RULES}"
+        return PromptBuildResult(
+            system_prompt=optimized_system,
+            user_prompt=optimized_user,
+        )
+
+
 class PromptEngine:
     """Builds consistent, constraint-aware prompts for AI requests."""
+
+    def __init__(self, optimizer: PromptOptimizer | None = None) -> None:
+        self.optimizer = optimizer or PromptOptimizer()
 
     def build_rag_prompt(
         self,
@@ -107,4 +137,8 @@ class PromptEngine:
             "6. Até cinco hashtags específicas\n"
             "7. Chamada para ação final\n"
         )
-        return PromptBuildResult(system_prompt=system_prompt, user_prompt=user_prompt)
+        base_prompt = PromptBuildResult(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+        return self.optimizer.optimize_content_prompt(base_prompt)
