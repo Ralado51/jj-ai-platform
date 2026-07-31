@@ -145,14 +145,20 @@ def stream_project_answer(
     events = service.stream_answer(project_id, user.id, data)
 
     def encode_events():
-        for event in events:
-            yield json.dumps(event, ensure_ascii=False) + "\n"
+        try:
+            for event in events:
+                yield (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
+        finally:
+            close = getattr(events, "close", None)
+            if callable(close):
+                close()
 
     return StreamingResponse(
         encode_events(),
-        media_type="application/x-ndjson",
+        media_type="application/x-ndjson; charset=utf-8",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
     )
