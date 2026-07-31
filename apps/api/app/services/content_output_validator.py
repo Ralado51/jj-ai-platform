@@ -28,15 +28,34 @@ class ContentOutputValidator:
         r"\[adicione[^\]]*\]",
         r"<insira[^>]*>",
         r"seu link aqui",
+        r"@youraccount\b",
     )
 
     OUTLINE_PATTERNS = (
         r"\bcomeçar com\b",
+        r"\bcomece com\b",
         r"\bexplicar o conceito\b",
         r"\bapresentar um exemplo\b",
         r"\bconcluir com\b",
         r"\bfalar sobre\b",
         r"\bmostrar como\b",
+        r"\banimação rápida\b",
+        r"\bfinalize com\b",
+    )
+
+    META_PATTERNS = (
+        r"\bessa resposta segue\b",
+        r"\besta resposta segue\b",
+        r"\beste roteiro foi (?:criado|projetado)\b",
+        r"\bcom base nos (?:materiais|documentos|dados)\b",
+        r"\bmantendo o conteúdo baseado\b",
+    )
+
+    UNSUPPORTED_PROMOTIONAL_PATTERNS = (
+        r"\bconheça nossos? guard-rails\b",
+        r"\buse nossos? guard-rails\b",
+        r"\bcontrate nossos? serviços\b",
+        r"\bfale com nossa equipe\b",
     )
 
     def validate(self, content: str) -> ContentValidationResult:
@@ -73,14 +92,46 @@ class ContentOutputValidator:
         if re.search(r"\[fonte\s+\d+\]", normalized):
             issues.append("A resposta contém citações indevidas para conteúdo criativo.")
 
+        if any(re.search(pattern, normalized) for pattern in self.META_PATTERNS):
+            issues.append("A resposta contém comentários do modelo sobre o próprio processo.")
+
+        if any(
+            re.search(pattern, normalized)
+            for pattern in self.UNSUPPORTED_PROMOTIONAL_PATTERNS
+        ):
+            issues.append(
+                "A resposta inventa um produto, serviço ou oferta comercial não informado no briefing."
+            )
+
+        hooks = self._extract_numbered_items(content, "gancho")
+        titles = self._extract_numbered_items(content, "título")
+        if len(hooks) >= 3 and len(titles) >= 3:
+            normalized_hooks = {self._normalize_item(item) for item in hooks[:3]}
+            normalized_titles = {self._normalize_item(item) for item in titles[:3]}
+            if normalized_hooks == normalized_titles or len(
+                normalized_hooks & normalized_titles
+            ) >= 2:
+                issues.append(
+                    "Os títulos não devem repetir os ganchos; explore ângulos diferentes."
+                )
+
         cta_index = normalized.rfind("chamada para ação")
         if cta_index >= 0 and cta_index < len(normalized) * 0.55:
             issues.append("A chamada para ação deve aparecer apenas no encerramento.")
 
         return ContentValidationResult(
             is_valid=not issues,
-            issues=tuple(issues),
+            issues=tuple(dict.fromkeys(issues)),
         )
+
+    @staticmethod
+    def _extract_numbered_items(content: str, label: str) -> list[str]:
+        pattern = rf"(?:\*\*)?{label}\s*\d(?:\*\*)?\s*[:.-]\s*[\"“]?([^\n\"”]+)"
+        return re.findall(pattern, content, flags=re.IGNORECASE)
+
+    @staticmethod
+    def _normalize_item(value: str) -> str:
+        return re.sub(r"[^a-z0-9áàâãéêíóôõúç]+", " ", value.lower()).strip()
 
     @staticmethod
     def build_refinement_instructions(result: ContentValidationResult) -> str:
