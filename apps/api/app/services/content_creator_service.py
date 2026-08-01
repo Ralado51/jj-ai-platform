@@ -8,6 +8,7 @@ from app.schemas.content_creator import (
     ContentCreatorBriefing,
     ContentCreatorResponse,
     ContentValidationResponse,
+    ModelRoutingResponse,
     PromptEvaluationResponse,
     PromptEvaluationScoresResponse,
 )
@@ -17,18 +18,44 @@ from app.services.chat_providers import (
     OllamaChatProvider,
 )
 from app.services.content_quality_pipeline import ContentQualityPipeline
+from app.services.model_router import AITaskType, ModelRoute, ModelRouter
 from app.services.prompt_engine import PromptEngine
 
 
 class ContentCreatorService:
-    def __init__(self, *, provider: ChatProvider | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        provider: ChatProvider | None = None,
+        model_router: ModelRouter | None = None,
+    ) -> None:
         settings = get_settings()
-        self.provider = provider or OllamaChatProvider(
-            base_url=settings.ollama_base_url,
-            model=settings.ollama_chat_model,
-            timeout_seconds=settings.ollama_chat_timeout_seconds,
-            temperature=settings.ollama_chat_temperature,
-        )
+
+        if provider is not None:
+            self.route = ModelRoute(
+                task=AITaskType.CONTENT_GENERATION,
+                model=provider.model,
+                reason="Provider injetado diretamente no Content Creator.",
+                used_fallback=False,
+            )
+            self.provider = provider
+        else:
+            router = model_router or ModelRouter(
+                default_model=settings.ollama_chat_model,
+                content_model=settings.ollama_content_model,
+                rag_model=settings.ollama_rag_model,
+                coding_model=settings.ollama_coding_model,
+                summarization_model=settings.ollama_summarization_model,
+                general_model=settings.ollama_general_model,
+            )
+            self.route = router.route(AITaskType.CONTENT_GENERATION)
+            self.provider = OllamaChatProvider(
+                base_url=settings.ollama_base_url,
+                model=self.route.model,
+                timeout_seconds=settings.ollama_chat_timeout_seconds,
+                temperature=settings.ollama_chat_temperature,
+            )
+
         self.prompt_engine = PromptEngine()
         self.pipeline = ContentQualityPipeline(provider=self.provider)
 
@@ -57,6 +84,12 @@ class ContentCreatorService:
             content=result.content,
             provider=self.provider.name,
             model=self.provider.model,
+            routing=ModelRoutingResponse(
+                task=self.route.task.value,
+                model=self.route.model,
+                reason=self.route.reason,
+                used_fallback=self.route.used_fallback,
+            ),
             refined=result.refined,
             validation=ContentValidationResponse(
                 is_valid=result.validation.is_valid,
