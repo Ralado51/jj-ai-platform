@@ -15,10 +15,12 @@ class _CandidateRepository:
         self,
         *,
         user_id,
+        task: AITaskType,
         minimum_samples: int,
         minimum_average_score: float,
     ):
         del user_id, minimum_samples, minimum_average_score
+        assert task is AITaskType.CONTENT_GENERATION
         return self.candidate
 
 
