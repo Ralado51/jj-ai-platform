@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from time import perf_counter
+from uuid import UUID
 
 import httpx
 
 from app.core.config import get_settings
+from app.repositories.benchmark_repository import BenchmarkRepository
 from app.schemas.benchmark import (
     BenchmarkModelResultResponse,
     BenchmarkRunRequest,
@@ -28,11 +30,17 @@ class _BenchmarkOutcome:
 
 
 class BenchmarkService:
-    def __init__(self) -> None:
+    def __init__(self, repository: BenchmarkRepository | None = None) -> None:
         self.settings = get_settings()
         self.evaluator = PromptEvaluator()
+        self.repository = repository
 
-    def run(self, payload: BenchmarkRunRequest) -> BenchmarkRunResponse:
+    def run(
+        self,
+        payload: BenchmarkRunRequest,
+        *,
+        user_id: UUID | None = None,
+    ) -> BenchmarkRunResponse:
         models = self._normalize_models(payload.models)
         outcomes = [self._run_model(model=model, payload=payload) for model in models]
         successful = [item for item in outcomes if item.success and item.scores is not None]
@@ -46,7 +54,7 @@ class BenchmarkService:
                 ),
             ).model
 
-        return BenchmarkRunResponse(
+        result = BenchmarkRunResponse(
             winner=winner,
             results=[
                 BenchmarkModelResultResponse(
@@ -67,6 +75,9 @@ class BenchmarkService:
                 )
             ],
         )
+        if self.repository is not None and user_id is not None:
+            self.repository.save(user_id=user_id, payload=payload, result=result)
+        return result
 
     def _run_model(self, *, model: str, payload: BenchmarkRunRequest) -> _BenchmarkOutcome:
         provider = OllamaChatProvider(
