@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     ollama_chat_model: str = "qwen2.5:3b"
     ollama_chat_timeout_seconds: float = 180.0
     ollama_chat_temperature: float = 0.2
+    ollama_content_model: str = ""
+    ollama_rag_model: str = ""
+    ollama_coding_model: str = ""
+    ollama_summarization_model: str = ""
+    ollama_general_model: str = ""
 
     rag_retrieval_top_k: int = 10
     rag_max_context_characters: int = 5000

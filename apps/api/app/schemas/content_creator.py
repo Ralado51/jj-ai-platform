@@ -36,10 +36,18 @@ class PromptEvaluationResponse(BaseModel):
     passed: bool
 
 
+class ModelRoutingResponse(BaseModel):
+    task: str
+    model: str
+    reason: str
+    used_fallback: bool
+
+
 class ContentCreatorResponse(BaseModel):
     content: str
     provider: str
     model: str
+    routing: ModelRoutingResponse
     refined: bool
     validation: ContentValidationResponse
     evaluation: PromptEvaluationResponse
