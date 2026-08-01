@@ -2,9 +2,16 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from app.services.model_router import AITaskType
+
 
 class BenchmarkRunRequest(BaseModel):
-    system_prompt: str = Field(default="Você é um assistente útil e objetivo.", min_length=1, max_length=8000)
+    task: AITaskType = AITaskType.GENERAL
+    system_prompt: str = Field(
+        default="Você é um assistente útil e objetivo.",
+        min_length=1,
+        max_length=8000,
+    )
     prompt: str = Field(min_length=2, max_length=12000)
     models: list[str] = Field(min_length=2, max_length=6)
 
@@ -30,5 +37,6 @@ class BenchmarkModelResultResponse(BaseModel):
 
 
 class BenchmarkRunResponse(BaseModel):
+    task: AITaskType
     winner: str | None
     results: list[BenchmarkModelResultResponse]
