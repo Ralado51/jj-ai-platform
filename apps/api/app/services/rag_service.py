@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.repositories.asset_repository import AssetRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.schemas.search import (
+    ModelRoutingResponse,
     RagAnswerRequest,
     RagAnswerResponse,
     RagExecutionMetrics,
@@ -20,6 +21,7 @@ from app.schemas.search import (
     SemanticSearchRequest,
 )
 from app.services.chat_providers import ChatProviderError, OllamaChatProvider
+from app.services.model_router import AITaskType, ModelRouter
 from app.services.prompt_engine import PromptEngine
 from app.services.search_service import SemanticSearchService
 
@@ -39,6 +41,14 @@ class RagService:
         self.conversation_repository = conversation_repository
         self.settings = get_settings()
         self.prompt_engine = PromptEngine()
+        self.model_router = ModelRouter(
+            default_model=self.settings.ollama_chat_model,
+            content_model=self.settings.ollama_content_model,
+            rag_model=self.settings.ollama_rag_model,
+            coding_model=self.settings.ollama_coding_model,
+            summarization_model=self.settings.ollama_summarization_model,
+            general_model=self.settings.ollama_general_model,
+        )
 
     def answer(
         self,
@@ -49,6 +59,7 @@ class RagService:
         total_started_at = perf_counter()
         prepared = self._prepare_answer(project_id, user_id, data)
         provider = prepared["provider"]
+        route = prepared["route"]
         selected_results = prepared["selected_results"]
 
         generation_started_at = perf_counter()
@@ -86,6 +97,12 @@ class RagService:
             chat_model=provider.model,
             embedding_provider=prepared["search_response"].provider,
             embedding_model=prepared["search_response"].model,
+            routing=ModelRoutingResponse(
+                task=route.task.value,
+                model=route.model,
+                reason=route.reason,
+                used_fallback=route.used_fallback,
+            ),
             metrics=metrics,
             sources=prepared["sources"],
         )
@@ -99,6 +116,7 @@ class RagService:
         total_started_at = perf_counter()
         prepared = self._prepare_answer(project_id, user_id, data)
         provider = prepared["provider"]
+        route = prepared["route"]
         selected_results = prepared["selected_results"]
 
         metadata = {
@@ -109,6 +127,12 @@ class RagService:
             "chat_model": provider.model,
             "embedding_provider": prepared["search_response"].provider,
             "embedding_model": prepared["search_response"].model,
+            "routing": {
+                "task": route.task.value,
+                "model": route.model,
+                "reason": route.reason,
+                "used_fallback": route.used_fallback,
+            },
             "sources": [source.model_dump(mode="json") for source in prepared["sources"]],
         }
 
@@ -193,9 +217,10 @@ class RagService:
             conversation_id=data.conversation_id,
         )
 
+        route = self.model_router.route(AITaskType.RAG)
         provider = OllamaChatProvider(
             base_url=self.settings.ollama_base_url,
-            model=self.settings.ollama_chat_model,
+            model=route.model,
             timeout_seconds=self.settings.ollama_chat_timeout_seconds,
             temperature=self.settings.ollama_chat_temperature,
         )
@@ -224,6 +249,7 @@ class RagService:
 
         return {
             "provider": provider,
+            "route": route,
             "selected_results": selected_results,
             "context": context,
             "search_response": search_response,
