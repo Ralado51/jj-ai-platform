@@ -39,11 +39,17 @@ class OllamaChatProvider(ChatProvider):
         model: str,
         timeout_seconds: float,
         temperature: float,
+        max_tokens: int = 2048,
+        repeat_penalty: float = 1.12,
+        max_characters: int = 24000,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.timeout_seconds = timeout_seconds
         self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.repeat_penalty = repeat_penalty
+        self.max_characters = max_characters
 
     def _payload(
         self,
@@ -59,7 +65,11 @@ class OllamaChatProvider(ChatProvider):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "options": {"temperature": self.temperature},
+            "options": {
+                "temperature": self.temperature,
+                "num_predict": self.max_tokens,
+                "repeat_penalty": self.repeat_penalty,
+            },
         }
 
     def generate(self, *, system_prompt: str, user_prompt: str) -> str:
@@ -80,7 +90,7 @@ class OllamaChatProvider(ChatProvider):
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
             raise ChatProviderError("Ollama returned an empty answer")
-        return content.strip()
+        return content[: self.max_characters].strip()
 
     def stream_generate(
         self,
@@ -89,6 +99,8 @@ class OllamaChatProvider(ChatProvider):
         user_prompt: str,
     ) -> Iterator[str]:
         received_content = False
+        generated_characters = 0
+        recent_chunks: list[str] = []
 
         with httpx.stream(
             "POST",
@@ -118,8 +130,24 @@ class OllamaChatProvider(ChatProvider):
                 if isinstance(message, dict):
                     content = message.get("content")
                     if isinstance(content, str) and content:
+                        normalized = " ".join(content.split())
+                        recent_chunks.append(normalized)
+                        recent_chunks = recent_chunks[-12:]
+
+                        if normalized and recent_chunks.count(normalized) >= 8:
+                            break
+
+                        remaining = self.max_characters - generated_characters
+                        if remaining <= 0:
+                            break
+
+                        chunk = content[:remaining]
+                        generated_characters += len(chunk)
                         received_content = True
-                        yield content
+                        yield chunk
+
+                        if generated_characters >= self.max_characters:
+                            break
 
                 if payload.get("done") is True:
                     break
