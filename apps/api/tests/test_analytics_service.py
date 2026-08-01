@@ -1,11 +1,16 @@
 from uuid import uuid4
 
 from app.services.analytics_service import AnalyticsService
+from app.services.model_router import AITaskType
 
 
 class FakeBenchmarkRepository:
-    def summary(self, *, user_id):
+    def __init__(self) -> None:
+        self.task = None
+
+    def summary(self, *, user_id, task=None):
         assert user_id is not None
+        self.task = task
         return {
             "total_runs": 3,
             "total_results": 6,
@@ -25,12 +30,23 @@ class FakeBenchmarkRepository:
 
 
 def test_analytics_summary_returns_model_ranking() -> None:
-    service = AnalyticsService(FakeBenchmarkRepository())
+    repository = FakeBenchmarkRepository()
+    service = AnalyticsService(repository)
 
     result = service.summary(user_id=uuid4())
 
+    assert repository.task is None
     assert result.total_runs == 3
     assert result.success_rate == 83.33
     assert result.top_model == "gemma3:4b"
     assert result.models[0].average_score == 8.9
     assert result.winners[0].wins == 2
+
+
+def test_analytics_summary_forwards_task_filter() -> None:
+    repository = FakeBenchmarkRepository()
+    service = AnalyticsService(repository)
+
+    service.summary(user_id=uuid4(), task=AITaskType.RAG)
+
+    assert repository.task is AITaskType.RAG
