@@ -22,7 +22,7 @@ def build_router() -> ModelRouter:
     )
 
 
-def test_selects_best_model_from_benchmark_history():
+def test_selects_best_model_from_matching_task_history():
     repository = FakeBenchmarkRepository(
         {
             "model": "llama3.1:8b",
@@ -32,16 +32,25 @@ def test_selects_best_model_from_benchmark_history():
         }
     )
     selector = AutoModelSelector(repository=repository, router=build_router())
+    user_id = uuid4()
 
-    result = selector.select(user_id=uuid4(), task=AITaskType.CONTENT_GENERATION)
+    result = selector.select(user_id=user_id, task=AITaskType.CONTENT_GENERATION)
 
     assert result.model == "llama3.1:8b"
     assert result.source == "benchmark_history"
     assert result.sample_size == 5
     assert result.used_fallback is False
+    assert repository.calls == [
+        {
+            "user_id": user_id,
+            "task": AITaskType.CONTENT_GENERATION,
+            "minimum_samples": 3,
+            "minimum_average_score": 7.0,
+        }
+    ]
 
 
-def test_falls_back_to_configured_router_when_history_is_insufficient():
+def test_falls_back_to_configured_router_when_task_history_is_insufficient():
     repository = FakeBenchmarkRepository(None)
     selector = AutoModelSelector(repository=repository, router=build_router())
 

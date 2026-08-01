@@ -18,6 +18,9 @@ class BenchmarkRun(Base, UUIDPrimaryKeyMixin, TimestampMixin):
         nullable=False,
         index=True,
     )
+    task_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="general", index=True
+    )
     prompt: Mapped[str] = mapped_column(Text, nullable=False)
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
     winner: Mapped[str | None] = mapped_column(String(150), nullable=True, index=True)

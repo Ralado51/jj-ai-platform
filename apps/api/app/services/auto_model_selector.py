@@ -20,7 +20,7 @@ class AutoModelSelection:
 
 
 class AutoModelSelector:
-    """Chooses one production model using benchmark history when available."""
+    """Chooses one production model using task-scoped benchmark history."""
 
     def __init__(
         self,
@@ -42,6 +42,7 @@ class AutoModelSelector:
     def select(self, *, user_id: UUID, task: AITaskType) -> AutoModelSelection:
         candidate = self.repository.best_model(
             user_id=user_id,
+            task=task,
             minimum_samples=self.minimum_samples,
             minimum_average_score=self.minimum_average_score,
         )
@@ -51,6 +52,7 @@ class AutoModelSelector:
                 model=candidate["model"],
                 reason=(
                     "Modelo selecionado pelo histórico de benchmarks do usuário "
+                    f"para a tarefa {task.value} "
                     f"({candidate['executions']} execuções, média {candidate['average_score']:.2f})."
                 ),
                 source="benchmark_history",
@@ -65,8 +67,8 @@ class AutoModelSelector:
             task=task,
             model=route.model,
             reason=(
-                "Histórico insuficiente ou abaixo do limiar de qualidade; "
-                f"{route.reason}"
+                f"Histórico de benchmarks para a tarefa {task.value} "
+                f"insuficiente ou abaixo do limiar; {route.reason}"
             ),
             source="configured_router",
             sample_size=0,
