@@ -52,6 +52,13 @@ class RagExecutionMetrics(BaseModel):
     total_time_ms: int
 
 
+class ModelRoutingResponse(BaseModel):
+    task: str
+    model: str
+    reason: str
+    used_fallback: bool
+
+
 class RagAnswerResponse(BaseModel):
     project_id: UUID
     question: str
@@ -60,5 +67,6 @@ class RagAnswerResponse(BaseModel):
     chat_model: str
     embedding_provider: str
     embedding_model: str
+    routing: ModelRoutingResponse
     metrics: RagExecutionMetrics
     sources: list[RagSource]
