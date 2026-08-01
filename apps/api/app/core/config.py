@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     ollama_summarization_model: str = ""
     ollama_general_model: str = ""
 
+    auto_model_selection_enabled: bool = True
+    auto_model_minimum_samples: int = 3
+    auto_model_minimum_average_score: float = 7.0
+
     rag_retrieval_top_k: int = 10
     rag_max_context_characters: int = 5000
 
