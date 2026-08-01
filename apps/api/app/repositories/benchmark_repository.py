@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.benchmark_run import BenchmarkResult, BenchmarkRun
 from app.schemas.benchmark import BenchmarkRunRequest, BenchmarkRunResponse
+from app.services.model_router import AITaskType
 
 
 class BenchmarkRepository:
@@ -16,6 +17,7 @@ class BenchmarkRepository:
     def save(self, *, user_id: UUID, payload: BenchmarkRunRequest, result: BenchmarkRunResponse) -> BenchmarkRun:
         run = BenchmarkRun(
             user_id=user_id,
+            task_type=payload.task.value,
             prompt=payload.prompt,
             system_prompt=payload.system_prompt,
             winner=result.winner,
@@ -47,6 +49,7 @@ class BenchmarkRepository:
         self,
         *,
         user_id: UUID,
+        task: AITaskType,
         minimum_samples: int,
         minimum_average_score: float,
     ) -> dict | None:
@@ -60,6 +63,7 @@ class BenchmarkRepository:
             .join(BenchmarkRun, BenchmarkRun.id == BenchmarkResult.run_id)
             .where(
                 BenchmarkRun.user_id == user_id,
+                BenchmarkRun.task_type == task.value,
                 BenchmarkResult.success.is_(True),
                 BenchmarkResult.overall.is_not(None),
             )
@@ -81,19 +85,23 @@ class BenchmarkRepository:
             "average_duration_ms": round(float(row.average_duration_ms or 0)),
         }
 
-    def summary(self, *, user_id: UUID) -> dict:
+    def summary(self, *, user_id: UUID, task: AITaskType | None = None) -> dict:
+        run_filters = [BenchmarkRun.user_id == user_id]
+        if task is not None:
+            run_filters.append(BenchmarkRun.task_type == task.value)
+
         total_runs = self.db.scalar(
-            select(func.count(BenchmarkRun.id)).where(BenchmarkRun.user_id == user_id)
+            select(func.count(BenchmarkRun.id)).where(*run_filters)
         ) or 0
         total_results = self.db.scalar(
             select(func.count(BenchmarkResult.id))
             .join(BenchmarkRun, BenchmarkRun.id == BenchmarkResult.run_id)
-            .where(BenchmarkRun.user_id == user_id)
+            .where(*run_filters)
         ) or 0
         success_count = self.db.scalar(
             select(func.count(BenchmarkResult.id))
             .join(BenchmarkRun, BenchmarkRun.id == BenchmarkResult.run_id)
-            .where(BenchmarkRun.user_id == user_id, BenchmarkResult.success.is_(True))
+            .where(*run_filters, BenchmarkResult.success.is_(True))
         ) or 0
 
         rows = self.db.execute(
@@ -105,14 +113,14 @@ class BenchmarkRepository:
                 func.sum(BenchmarkResult.estimated_tokens),
             )
             .join(BenchmarkRun, BenchmarkRun.id == BenchmarkResult.run_id)
-            .where(BenchmarkRun.user_id == user_id, BenchmarkResult.success.is_(True))
+            .where(*run_filters, BenchmarkResult.success.is_(True))
             .group_by(BenchmarkResult.model)
             .order_by(desc(func.avg(BenchmarkResult.overall)))
         ).all()
 
         winner_rows = self.db.execute(
             select(BenchmarkRun.winner, func.count(BenchmarkRun.id))
-            .where(BenchmarkRun.user_id == user_id, BenchmarkRun.winner.is_not(None))
+            .where(*run_filters, BenchmarkRun.winner.is_not(None))
             .group_by(BenchmarkRun.winner)
             .order_by(desc(func.count(BenchmarkRun.id)))
         ).all()
