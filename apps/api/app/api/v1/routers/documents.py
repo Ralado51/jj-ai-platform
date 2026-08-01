@@ -9,6 +9,7 @@ from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.asset_repository import AssetRepository
+from app.repositories.benchmark_repository import BenchmarkRepository
 from app.repositories.conversation_repository import ConversationRepository
 from app.repositories.document_chunk_repository import DocumentChunkRepository
 from app.repositories.project_repository import ProjectRepository
@@ -26,9 +27,9 @@ from app.schemas.search import (
     SemanticSearchRequest,
     SemanticSearchResponse,
 )
+from app.services.auto_model_rag_service import AutoModelRagService
 from app.services.document_service import DocumentService
 from app.services.embedding_service import EmbeddingService
-from app.services.rag_service import RagService
 from app.services.search_service import SemanticSearchService
 from app.services.storage import StorageService, get_storage_service
 
@@ -67,7 +68,7 @@ def get_search_service(db: Session = Depends(get_db)) -> SemanticSearchService:
     )
 
 
-def get_rag_service(db: Session = Depends(get_db)) -> RagService:
+def get_rag_service(db: Session = Depends(get_db)) -> AutoModelRagService:
     asset_repository = AssetRepository(db)
     embedding_service = EmbeddingService(asset_repository=asset_repository)
     search_service = SemanticSearchService(
@@ -75,10 +76,11 @@ def get_rag_service(db: Session = Depends(get_db)) -> RagService:
         chunk_repository=DocumentChunkRepository(db),
         embedding_service=embedding_service,
     )
-    return RagService(
+    return AutoModelRagService(
         search_service=search_service,
         asset_repository=asset_repository,
         conversation_repository=ConversationRepository(db),
+        benchmark_repository=BenchmarkRepository(db),
     )
 
 
@@ -125,7 +127,7 @@ def semantic_search(
 def ask_project(
     project_id: UUID,
     data: RagAnswerRequest,
-    service: RagService = Depends(get_rag_service),
+    service: AutoModelRagService = Depends(get_rag_service),
     user: User = Depends(
         require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
     ),
@@ -137,7 +139,7 @@ def ask_project(
 def stream_project_answer(
     project_id: UUID,
     data: RagAnswerRequest,
-    service: RagService = Depends(get_rag_service),
+    service: AutoModelRagService = Depends(get_rag_service),
     user: User = Depends(
         require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
     ),
