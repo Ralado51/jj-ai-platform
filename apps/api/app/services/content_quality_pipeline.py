@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services.chat_providers import ChatProvider
+from app.services.content_output_sanitizer import ContentOutputSanitizer
 from app.services.content_output_validator import (
     ContentOutputValidator,
     ContentValidationResult,
@@ -21,7 +22,7 @@ class ContentQualityPipelineResult:
 
 
 class ContentQualityPipeline:
-    """Runs validator and evaluator before a single optional refinement pass."""
+    """Runs validation, evaluation, optional refinement and final sanitization."""
 
     def __init__(
         self,
@@ -29,10 +30,12 @@ class ContentQualityPipeline:
         provider: ChatProvider,
         validator: ContentOutputValidator | None = None,
         evaluator: PromptEvaluator | None = None,
+        sanitizer: ContentOutputSanitizer | None = None,
     ) -> None:
         self.provider = provider
         self.validator = validator or ContentOutputValidator()
         self.evaluator = evaluator or PromptEvaluator()
+        self.sanitizer = sanitizer or ContentOutputSanitizer()
         self.refiner = ContentRefiner(provider=provider, validator=self.validator)
 
     def process(
@@ -41,26 +44,29 @@ class ContentQualityPipeline:
         original_content: str,
         original_prompt: PromptBuildResult,
     ) -> ContentQualityPipelineResult:
-        initial_validation = self.validator.validate(original_content)
-        initial_evaluation = self.evaluator.evaluate(original_content)
+        initial_content = self.sanitizer.sanitize(original_content)
+        initial_validation = self.validator.validate(initial_content)
+        initial_evaluation = self.evaluator.evaluate(initial_content)
 
         if initial_validation.is_valid and initial_evaluation.passed:
             return ContentQualityPipelineResult(
-                content=original_content.strip(),
+                content=initial_content,
                 validation=initial_validation,
                 evaluation=initial_evaluation,
                 refined=False,
             )
 
         refinement = self.refiner.refine_once(
-            original_content=original_content,
+            original_content=initial_content,
             original_prompt=original_prompt,
         )
-        final_evaluation = self.evaluator.evaluate(refinement.content)
+        final_content = self.sanitizer.sanitize(refinement.content)
+        final_validation = self.validator.validate(final_content)
+        final_evaluation = self.evaluator.evaluate(final_content)
 
         return ContentQualityPipelineResult(
-            content=refinement.content,
-            validation=refinement.validation,
+            content=final_content,
+            validation=final_validation,
             evaluation=final_evaluation,
             refined=refinement.refined,
         )
