@@ -51,7 +51,8 @@ class AutoModelSelector:
                 task=task,
                 model=candidate["model"],
                 reason=(
-                    f"Modelo selecionado pelo histórico de {task.value} do usuário "
+                    "Modelo selecionado pelo histórico de benchmarks do usuário "
+                    f"para a tarefa {task.value} "
                     f"({candidate['executions']} execuções, média {candidate['average_score']:.2f})."
                 ),
                 source="benchmark_history",
@@ -66,8 +67,8 @@ class AutoModelSelector:
             task=task,
             model=route.model,
             reason=(
-                f"Histórico de {task.value} insuficiente ou abaixo do limiar; "
-                f"{route.reason}"
+                f"Histórico de benchmarks para a tarefa {task.value} "
+                f"insuficiente ou abaixo do limiar; {route.reason}"
             ),
             source="configured_router",
             sample_size=0,
