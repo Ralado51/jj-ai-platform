@@ -43,6 +43,44 @@ class BenchmarkRepository:
         self.db.refresh(run)
         return run
 
+    def best_model(
+        self,
+        *,
+        user_id: UUID,
+        minimum_samples: int,
+        minimum_average_score: float,
+    ) -> dict | None:
+        row = self.db.execute(
+            select(
+                BenchmarkResult.model,
+                func.count(BenchmarkResult.id).label("executions"),
+                func.avg(BenchmarkResult.overall).label("average_score"),
+                func.avg(BenchmarkResult.duration_ms).label("average_duration_ms"),
+            )
+            .join(BenchmarkRun, BenchmarkRun.id == BenchmarkResult.run_id)
+            .where(
+                BenchmarkRun.user_id == user_id,
+                BenchmarkResult.success.is_(True),
+                BenchmarkResult.overall.is_not(None),
+            )
+            .group_by(BenchmarkResult.model)
+            .having(func.count(BenchmarkResult.id) >= minimum_samples)
+            .having(func.avg(BenchmarkResult.overall) >= minimum_average_score)
+            .order_by(
+                desc(func.avg(BenchmarkResult.overall)),
+                func.avg(BenchmarkResult.duration_ms),
+            )
+            .limit(1)
+        ).first()
+        if row is None:
+            return None
+        return {
+            "model": row.model,
+            "executions": int(row.executions),
+            "average_score": round(float(row.average_score), 2),
+            "average_duration_ms": round(float(row.average_duration_ms or 0)),
+        }
+
     def summary(self, *, user_id: UUID) -> dict:
         total_runs = self.db.scalar(
             select(func.count(BenchmarkRun.id)).where(BenchmarkRun.user_id == user_id)
