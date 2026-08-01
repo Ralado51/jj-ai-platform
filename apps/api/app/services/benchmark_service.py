@@ -55,6 +55,7 @@ class BenchmarkService:
             ).model
 
         result = BenchmarkRunResponse(
+            task=payload.task,
             winner=winner,
             results=[
                 BenchmarkModelResultResponse(
