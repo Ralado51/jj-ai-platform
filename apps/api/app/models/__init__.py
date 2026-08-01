@@ -1,4 +1,5 @@
 from app.models.agent import Agent
+from app.models.agent_execution import AgentExecution, AgentMemory
 from app.models.asset import Asset
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.benchmark_run import BenchmarkResult, BenchmarkRun
@@ -14,6 +15,8 @@ from app.models.user import User, UserRole
 
 __all__ = [
     "Agent",
+    "AgentExecution",
+    "AgentMemory",
     "Asset",
     "AssetType",
     "Base",
