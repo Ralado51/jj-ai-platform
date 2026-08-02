@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from time import perf_counter
+from uuid import UUID
+
 from app.core.config import get_settings
+from app.repositories.agent_repository import AgentRepository
 from app.schemas.agents import AgentDescriptorResponse, AgentRunResponse
 from app.services.agent_framework import (
     AgentDescriptor,
@@ -13,9 +17,14 @@ from app.services.model_router import AITaskType, ModelRouter
 
 
 class AgentService:
-    def __init__(self, registry: AgentRegistry | None = None) -> None:
+    def __init__(
+        self,
+        registry: AgentRegistry | None = None,
+        repository: AgentRepository | None = None,
+    ) -> None:
         self.registry = registry or self._build_registry()
         self.router = AgentRouter(self.registry)
+        self.repository = repository
 
     def list_agents(self) -> list[AgentDescriptorResponse]:
         return [
@@ -28,11 +37,65 @@ class AgentService:
             for agent in self.registry.list()
         ]
 
-    def run(self, *, instruction: str, agent_id: str | None = None) -> AgentRunResponse:
+    def run(
+        self,
+        *,
+        instruction: str,
+        agent_id: str | None = None,
+        user_id: UUID | None = None,
+        session_key: str | None = None,
+        use_memory: bool = True,
+    ) -> AgentRunResponse:
         route = self.router.route(instruction=instruction, agent_id=agent_id)
-        result = route.agent.execute(instruction=instruction)
-        descriptor = result.agent
+        descriptor = route.agent.descriptor
+        memory_items = []
+        effective_instruction = instruction.strip()
+
+        if (
+            use_memory
+            and self.repository is not None
+            and user_id is not None
+            and session_key
+        ):
+            memory_items = self.repository.recent_memory(
+                user_id=user_id,
+                agent_id=descriptor.id,
+                session_key=session_key,
+            )
+            if memory_items:
+                history = "\n".join(
+                    f"{item.role.upper()}: {item.content}" for item in memory_items
+                )
+                effective_instruction = (
+                    "HISTÓRICO RECENTE DESTA SESSÃO\n"
+                    f"{history}\n\n"
+                    "SOLICITAÇÃO ATUAL\n"
+                    f"{instruction.strip()}\n\n"
+                    "Use o histórico somente para continuidade. Priorize a solicitação atual."
+                )
+
+        started_at = perf_counter()
+        result = route.agent.execute(instruction=effective_instruction)
+        duration_ms = max(0, round((perf_counter() - started_at) * 1000))
+        execution_id = None
+
+        if self.repository is not None and user_id is not None:
+            execution = self.repository.save_execution(
+                user_id=user_id,
+                agent_id=descriptor.id,
+                task_type=descriptor.task.value,
+                session_key=session_key,
+                instruction=instruction.strip(),
+                response=result.content,
+                routing_reason=route.reason,
+                provider=result.provider,
+                model=result.model,
+                duration_ms=duration_ms,
+            )
+            execution_id = execution.id
+
         return AgentRunResponse(
+            execution_id=execution_id,
             agent=AgentDescriptorResponse(
                 id=descriptor.id,
                 name=descriptor.name,
@@ -43,6 +106,9 @@ class AgentService:
             content=result.content,
             provider=result.provider,
             model=result.model,
+            duration_ms=duration_ms,
+            memory_items_used=len(memory_items),
+            session_key=session_key,
         )
 
     @staticmethod
