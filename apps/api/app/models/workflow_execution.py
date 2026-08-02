@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
@@ -31,3 +31,4 @@ class WorkflowExecution(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     total_duration_ms: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     final_content: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    step_details: Mapped[list[dict]] = mapped_column(JSONB, nullable=False, default=list)
