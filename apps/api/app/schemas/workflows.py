@@ -42,6 +42,7 @@ class WorkflowRunRequest(BaseModel):
 
 
 class WorkflowRunResponse(BaseModel):
+    execution_id: UUID
     workflow_id: UUID
     workflow_name: str
     steps: list[AgentRunResponse]
@@ -50,6 +51,26 @@ class WorkflowRunResponse(BaseModel):
     project_id: UUID | None = None
     session_key: str | None = None
     use_memory: bool
+
+
+class WorkflowExecutionResponse(BaseModel):
+    id: UUID
+    workflow_id: UUID
+    project_id: UUID | None
+    workflow_name: str
+    status: str
+    instruction: str
+    session_key: str | None
+    use_memory: bool
+    steps_total: int
+    steps_completed: int
+    total_duration_ms: int
+    final_content: str | None
+    error_message: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class WorkflowResponse(BaseModel):
