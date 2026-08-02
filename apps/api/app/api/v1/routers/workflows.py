@@ -56,80 +56,17 @@ def serialize_step_details(steps: list[AgentRunResponse]) -> list[dict]:
     ]
 
 
-@router.get("", response_model=list[WorkflowResponse])
-def list_workflows(
-    project_id: UUID | None = None,
-    include_inactive: bool = Query(default=False),
-    repository: AgentWorkflowRepository = Depends(get_repository),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
-) -> list[WorkflowResponse]:
-    return repository.list(user_id=user.id, project_id=project_id, active_only=not include_inactive)
-
-
-@router.get("/executions", response_model=list[WorkflowExecutionResponse])
-def list_workflow_executions(
-    workflow_id: UUID | None = None,
-    limit: int = Query(default=50, ge=1, le=200),
-    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
-) -> list[WorkflowExecutionResponse]:
-    return repository.list(user_id=user.id, workflow_id=workflow_id, limit=limit)
-
-
-@router.get("/executions/{execution_id}", response_model=WorkflowExecutionResponse)
-def get_workflow_execution(
-    execution_id: UUID,
-    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
-) -> WorkflowExecutionResponse:
-    execution = repository.get(execution_id=execution_id, user_id=user.id)
-    if execution is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execução não encontrada.")
-    return execution
-
-
-@router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
-def create_workflow(
-    payload: WorkflowCreate,
-    repository: AgentWorkflowRepository = Depends(get_repository),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
-) -> WorkflowResponse:
-    workflow = AgentWorkflow(
-        user_id=user.id,
-        project_id=payload.project_id,
-        name=payload.name.strip(),
-        description=payload.description,
-        steps=[step.model_dump() for step in payload.steps],
-        default_instruction=payload.default_instruction,
-        session_key=payload.session_key,
-        use_memory=payload.use_memory,
-    )
-    return repository.create(workflow)
-
-
-@router.post("/{workflow_id}/run", response_model=WorkflowRunResponse)
-def run_workflow(
-    workflow_id: UUID,
-    payload: WorkflowRunRequest,
-    repository: AgentWorkflowRepository = Depends(get_repository),
-    execution_repository: WorkflowExecutionRepository = Depends(get_execution_repository),
-    agent_service: AgentService = Depends(get_agent_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+def execute_workflow(
+    *,
+    workflow: AgentWorkflow,
+    instruction: str,
+    project_id: UUID | None,
+    session_key: str | None,
+    use_memory: bool,
+    user: User,
+    execution_repository: WorkflowExecutionRepository,
+    agent_service: AgentService,
 ) -> WorkflowRunResponse:
-    workflow = repository.get(workflow_id=workflow_id, user_id=user.id)
-    if workflow is None or not workflow.is_active:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
-
-    instruction = (payload.instruction or workflow.default_instruction or "").strip()
-    if not instruction:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Informe uma instrução ou configure uma instrução padrão no workflow.",
-        )
-
-    project_id = payload.project_id if payload.project_id is not None else workflow.project_id
-    session_key = payload.session_key if payload.session_key is not None else workflow.session_key
-    use_memory = payload.use_memory if payload.use_memory is not None else workflow.use_memory
     steps = [
         AgentOrchestrationStep(agent_id=step["agent_id"], instruction=step.get("instruction"))
         for step in workflow.steps
@@ -189,6 +126,124 @@ def run_workflow(
         project_id=project_id,
         session_key=session_key,
         use_memory=use_memory,
+    )
+
+
+@router.get("", response_model=list[WorkflowResponse])
+def list_workflows(
+    project_id: UUID | None = None,
+    include_inactive: bool = Query(default=False),
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> list[WorkflowResponse]:
+    return repository.list(user_id=user.id, project_id=project_id, active_only=not include_inactive)
+
+
+@router.get("/executions", response_model=list[WorkflowExecutionResponse])
+def list_workflow_executions(
+    workflow_id: UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> list[WorkflowExecutionResponse]:
+    return repository.list(user_id=user.id, workflow_id=workflow_id, limit=limit)
+
+
+@router.get("/executions/{execution_id}", response_model=WorkflowExecutionResponse)
+def get_workflow_execution(
+    execution_id: UUID,
+    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowExecutionResponse:
+    execution = repository.get(execution_id=execution_id, user_id=user.id)
+    if execution is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execução não encontrada.")
+    return execution
+
+
+@router.post("/executions/{execution_id}/retry", response_model=WorkflowRunResponse)
+def retry_workflow_execution(
+    execution_id: UUID,
+    payload: WorkflowRunRequest,
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    execution_repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    agent_service: AgentService = Depends(get_agent_service),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowRunResponse:
+    previous = execution_repository.get(execution_id=execution_id, user_id=user.id)
+    if previous is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execução não encontrada.")
+    if previous.status == "running":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Uma execução em andamento não pode ser repetida.",
+        )
+
+    workflow = repository.get(workflow_id=previous.workflow_id, user_id=user.id)
+    if workflow is None or not workflow.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
+
+    instruction = (payload.instruction or previous.instruction).strip()
+    return execute_workflow(
+        workflow=workflow,
+        instruction=instruction,
+        project_id=payload.project_id if payload.project_id is not None else previous.project_id,
+        session_key=payload.session_key if payload.session_key is not None else previous.session_key,
+        use_memory=payload.use_memory if payload.use_memory is not None else previous.use_memory,
+        user=user,
+        execution_repository=execution_repository,
+        agent_service=agent_service,
+    )
+
+
+@router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
+def create_workflow(
+    payload: WorkflowCreate,
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> WorkflowResponse:
+    workflow = AgentWorkflow(
+        user_id=user.id,
+        project_id=payload.project_id,
+        name=payload.name.strip(),
+        description=payload.description,
+        steps=[step.model_dump() for step in payload.steps],
+        default_instruction=payload.default_instruction,
+        session_key=payload.session_key,
+        use_memory=payload.use_memory,
+    )
+    return repository.create(workflow)
+
+
+@router.post("/{workflow_id}/run", response_model=WorkflowRunResponse)
+def run_workflow(
+    workflow_id: UUID,
+    payload: WorkflowRunRequest,
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    execution_repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    agent_service: AgentService = Depends(get_agent_service),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowRunResponse:
+    workflow = repository.get(workflow_id=workflow_id, user_id=user.id)
+    if workflow is None or not workflow.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
+
+    instruction = (payload.instruction or workflow.default_instruction or "").strip()
+    if not instruction:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe uma instrução ou configure uma instrução padrão no workflow.",
+        )
+
+    return execute_workflow(
+        workflow=workflow,
+        instruction=instruction,
+        project_id=payload.project_id if payload.project_id is not None else workflow.project_id,
+        session_key=payload.session_key if payload.session_key is not None else workflow.session_key,
+        use_memory=payload.use_memory if payload.use_memory is not None else workflow.use_memory,
+        user=user,
+        execution_repository=execution_repository,
+        agent_service=agent_service,
     )
 
 
