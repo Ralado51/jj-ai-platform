@@ -18,6 +18,7 @@ class AgentDescriptorResponse(BaseModel):
 class AgentRunRequest(BaseModel):
     instruction: str = Field(min_length=2, max_length=12000)
     agent_id: str | None = Field(default=None, min_length=1, max_length=80)
+    project_id: UUID | None = None
     session_key: str | None = Field(default=None, min_length=1, max_length=120)
     use_memory: bool = True
 
@@ -29,9 +30,11 @@ class AgentRunResponse(BaseModel):
     content: str
     provider: str
     model: str
+    model_selection_source: str = "configured_router"
     duration_ms: int = 0
     memory_items_used: int = 0
     session_key: str | None = None
+    project_id: UUID | None = None
 
 
 class AgentExecutionResponse(BaseModel):
