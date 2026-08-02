@@ -13,6 +13,7 @@ from app.models.project import Project
 from app.models.prompt_template import PromptTemplate
 from app.models.task import Task
 from app.models.user import User, UserRole
+from app.models.workflow_execution import WorkflowExecution
 
 __all__ = [
     "Agent",
@@ -39,4 +40,5 @@ __all__ = [
     "UUIDPrimaryKeyMixin",
     "User",
     "UserRole",
+    "WorkflowExecution",
 ]
