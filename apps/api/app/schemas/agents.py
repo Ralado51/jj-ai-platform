@@ -37,6 +37,25 @@ class AgentRunResponse(BaseModel):
     project_id: UUID | None = None
 
 
+class AgentOrchestrationStepRequest(BaseModel):
+    agent_id: str = Field(min_length=1, max_length=80)
+    instruction: str | None = Field(default=None, min_length=2, max_length=4000)
+
+
+class AgentOrchestrationRequest(BaseModel):
+    instruction: str = Field(min_length=2, max_length=12000)
+    steps: list[AgentOrchestrationStepRequest] = Field(min_length=1, max_length=6)
+    project_id: UUID | None = None
+    session_key: str | None = Field(default=None, min_length=1, max_length=120)
+    use_memory: bool = True
+
+
+class AgentOrchestrationResponse(BaseModel):
+    steps: list[AgentRunResponse]
+    final_content: str
+    total_duration_ms: int
+
+
 class AgentExecutionResponse(BaseModel):
     id: UUID
     agent_id: str
