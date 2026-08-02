@@ -14,9 +14,12 @@ from app.schemas.agents import (
     AgentDescriptorResponse,
     AgentExecutionResponse,
     AgentMemoryResponse,
+    AgentOrchestrationRequest,
+    AgentOrchestrationResponse,
     AgentRunRequest,
     AgentRunResponse,
 )
+from app.services.agent_orchestrator import AgentOrchestrationStep, AgentOrchestrator
 from app.services.agent_service import AgentService
 from app.services.auto_model_rag_service import AutoModelRagService
 from app.services.chat_providers import ChatProviderError
@@ -75,10 +78,7 @@ def run_agent(
             use_memory=payload.use_memory,
         )
     except KeyError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(exc),
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -88,6 +88,48 @@ def run_agent(
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Não foi possível executar o agente no modelo local.",
+        ) from exc
+
+
+@router.post("/orchestrate", response_model=AgentOrchestrationResponse)
+def orchestrate_agents(
+    payload: AgentOrchestrationRequest,
+    service: AgentService = Depends(get_service),
+    user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> AgentOrchestrationResponse:
+    try:
+        result = AgentOrchestrator(service).run(
+            initial_instruction=payload.instruction,
+            steps=[
+                AgentOrchestrationStep(
+                    agent_id=step.agent_id,
+                    instruction=step.instruction,
+                )
+                for step in payload.steps
+            ],
+            user_id=user.id,
+            project_id=payload.project_id,
+            session_key=payload.session_key,
+            use_memory=payload.use_memory,
+        )
+        return AgentOrchestrationResponse(
+            steps=result.steps,
+            final_content=result.final_content,
+            total_duration_ms=result.total_duration_ms,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ChatProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Não foi possível concluir a orquestração de agentes.",
         ) from exc
 
 
