@@ -4,11 +4,21 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
+from app.api.v1.routers.agents import get_service as get_agent_service
 from app.db.dependencies import get_db
 from app.models.agent_workflow import AgentWorkflow
 from app.models.user import User, UserRole
 from app.repositories.agent_workflow_repository import AgentWorkflowRepository
-from app.schemas.workflows import WorkflowCreate, WorkflowResponse, WorkflowUpdate
+from app.schemas.workflows import (
+    WorkflowCreate,
+    WorkflowResponse,
+    WorkflowRunRequest,
+    WorkflowRunResponse,
+    WorkflowUpdate,
+)
+from app.services.agent_orchestrator import AgentOrchestrationStep, AgentOrchestrator
+from app.services.agent_service import AgentService
+from app.services.chat_providers import ChatProviderError
 
 router = APIRouter(prefix="/workflows", tags=["workflows"])
 
@@ -44,6 +54,68 @@ def create_workflow(
         use_memory=payload.use_memory,
     )
     return repository.create(workflow)
+
+
+@router.post("/{workflow_id}/run", response_model=WorkflowRunResponse)
+def run_workflow(
+    workflow_id: UUID,
+    payload: WorkflowRunRequest,
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    agent_service: AgentService = Depends(get_agent_service),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowRunResponse:
+    workflow = repository.get(workflow_id=workflow_id, user_id=user.id)
+    if workflow is None or not workflow.is_active:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
+
+    instruction = (payload.instruction or workflow.default_instruction or "").strip()
+    if not instruction:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Informe uma instrução ou configure uma instrução padrão no workflow.",
+        )
+
+    project_id = payload.project_id if payload.project_id is not None else workflow.project_id
+    session_key = payload.session_key if payload.session_key is not None else workflow.session_key
+    use_memory = payload.use_memory if payload.use_memory is not None else workflow.use_memory
+    steps = [
+        AgentOrchestrationStep(
+            agent_id=step["agent_id"],
+            instruction=step.get("instruction"),
+        )
+        for step in workflow.steps
+    ]
+
+    try:
+        result = AgentOrchestrator(agent_service).run(
+            initial_instruction=instruction,
+            steps=steps,
+            user_id=user.id,
+            project_id=project_id,
+            session_key=session_key,
+            use_memory=use_memory,
+        )
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(exc),
+        ) from exc
+    except ChatProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Não foi possível executar o workflow nos modelos configurados.",
+        ) from exc
+
+    return WorkflowRunResponse(
+        workflow_id=workflow.id,
+        workflow_name=workflow.name,
+        steps=result.steps,
+        final_content=result.final_content,
+        total_duration_ms=result.total_duration_ms,
+        project_id=project_id,
+        session_key=session_key,
+        use_memory=use_memory,
+    )
 
 
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
