@@ -8,9 +8,12 @@ from app.api.v1.routers.agents import get_service as get_agent_service
 from app.db.dependencies import get_db
 from app.models.agent_workflow import AgentWorkflow
 from app.models.user import User, UserRole
+from app.models.workflow_execution import WorkflowExecution
 from app.repositories.agent_workflow_repository import AgentWorkflowRepository
+from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
 from app.schemas.workflows import (
     WorkflowCreate,
+    WorkflowExecutionResponse,
     WorkflowResponse,
     WorkflowRunRequest,
     WorkflowRunResponse,
@@ -27,6 +30,10 @@ def get_repository(db: Session = Depends(get_db)) -> AgentWorkflowRepository:
     return AgentWorkflowRepository(db)
 
 
+def get_execution_repository(db: Session = Depends(get_db)) -> WorkflowExecutionRepository:
+    return WorkflowExecutionRepository(db)
+
+
 @router.get("", response_model=list[WorkflowResponse])
 def list_workflows(
     project_id: UUID | None = None,
@@ -35,6 +42,28 @@ def list_workflows(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> list[WorkflowResponse]:
     return repository.list(user_id=user.id, project_id=project_id, active_only=not include_inactive)
+
+
+@router.get("/executions", response_model=list[WorkflowExecutionResponse])
+def list_workflow_executions(
+    workflow_id: UUID | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> list[WorkflowExecutionResponse]:
+    return repository.list(user_id=user.id, workflow_id=workflow_id, limit=limit)
+
+
+@router.get("/executions/{execution_id}", response_model=WorkflowExecutionResponse)
+def get_workflow_execution(
+    execution_id: UUID,
+    repository: WorkflowExecutionRepository = Depends(get_execution_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowExecutionResponse:
+    execution = repository.get(execution_id=execution_id, user_id=user.id)
+    if execution is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Execução não encontrada.")
+    return execution
 
 
 @router.post("", response_model=WorkflowResponse, status_code=status.HTTP_201_CREATED)
@@ -61,6 +90,7 @@ def run_workflow(
     workflow_id: UUID,
     payload: WorkflowRunRequest,
     repository: AgentWorkflowRepository = Depends(get_repository),
+    execution_repository: WorkflowExecutionRepository = Depends(get_execution_repository),
     agent_service: AgentService = Depends(get_agent_service),
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> WorkflowRunResponse:
@@ -79,12 +109,22 @@ def run_workflow(
     session_key = payload.session_key if payload.session_key is not None else workflow.session_key
     use_memory = payload.use_memory if payload.use_memory is not None else workflow.use_memory
     steps = [
-        AgentOrchestrationStep(
-            agent_id=step["agent_id"],
-            instruction=step.get("instruction"),
-        )
+        AgentOrchestrationStep(agent_id=step["agent_id"], instruction=step.get("instruction"))
         for step in workflow.steps
     ]
+    execution = execution_repository.create(
+        WorkflowExecution(
+            user_id=user.id,
+            workflow_id=workflow.id,
+            project_id=project_id,
+            workflow_name=workflow.name,
+            status="running",
+            instruction=instruction,
+            session_key=session_key,
+            use_memory=use_memory,
+            steps_total=len(steps),
+        )
+    )
 
     try:
         result = AgentOrchestrator(agent_service).run(
@@ -96,17 +136,27 @@ def run_workflow(
             use_memory=use_memory,
         )
     except (KeyError, ValueError) as exc:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=str(exc),
-        ) from exc
+        execution.status = "failed"
+        execution.error_message = str(exc)
+        execution_repository.save(execution)
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
     except ChatProviderError as exc:
+        execution.status = "failed"
+        execution.error_message = "Não foi possível executar o workflow nos modelos configurados."
+        execution_repository.save(execution)
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Não foi possível executar o workflow nos modelos configurados.",
+            detail=execution.error_message,
         ) from exc
 
+    execution.status = "completed"
+    execution.steps_completed = len(result.steps)
+    execution.total_duration_ms = result.total_duration_ms
+    execution.final_content = result.final_content
+    execution_repository.save(execution)
+
     return WorkflowRunResponse(
+        execution_id=execution.id,
         workflow_id=workflow.id,
         workflow_name=workflow.name,
         steps=result.steps,
