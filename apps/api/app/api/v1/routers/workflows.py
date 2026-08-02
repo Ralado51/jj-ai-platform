@@ -11,6 +11,7 @@ from app.models.user import User, UserRole
 from app.models.workflow_execution import WorkflowExecution
 from app.repositories.agent_workflow_repository import AgentWorkflowRepository
 from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
+from app.schemas.agents import AgentRunResponse
 from app.schemas.workflows import (
     WorkflowCreate,
     WorkflowExecutionResponse,
@@ -32,6 +33,27 @@ def get_repository(db: Session = Depends(get_db)) -> AgentWorkflowRepository:
 
 def get_execution_repository(db: Session = Depends(get_db)) -> WorkflowExecutionRepository:
     return WorkflowExecutionRepository(db)
+
+
+def serialize_step_details(steps: list[AgentRunResponse]) -> list[dict]:
+    return [
+        {
+            "index": index,
+            "agent_id": step.agent.id,
+            "agent_name": step.agent.name,
+            "task": step.agent.task.value,
+            "status": "completed",
+            "execution_id": str(step.execution_id) if step.execution_id else None,
+            "provider": step.provider,
+            "model": step.model,
+            "model_selection_source": step.model_selection_source,
+            "routing_reason": step.routing_reason,
+            "duration_ms": step.duration_ms,
+            "memory_items_used": step.memory_items_used,
+            "content": step.content,
+        }
+        for index, step in enumerate(steps, start=1)
+    ]
 
 
 @router.get("", response_model=list[WorkflowResponse])
@@ -123,6 +145,7 @@ def run_workflow(
             session_key=session_key,
             use_memory=use_memory,
             steps_total=len(steps),
+            step_details=[],
         )
     )
 
@@ -153,6 +176,7 @@ def run_workflow(
     execution.steps_completed = len(result.steps)
     execution.total_duration_ms = result.total_duration_ms
     execution.final_content = result.final_content
+    execution.step_details = serialize_step_details(result.steps)
     execution_repository.save(execution)
 
     return WorkflowRunResponse(
