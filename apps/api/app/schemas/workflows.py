@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+from app.schemas.agents import AgentRunResponse
+
 
 class WorkflowStep(BaseModel):
     agent_id: str = Field(min_length=1, max_length=80)
@@ -30,6 +32,24 @@ class WorkflowUpdate(BaseModel):
     session_key: str | None = Field(default=None, min_length=1, max_length=120)
     use_memory: bool | None = None
     is_active: bool | None = None
+
+
+class WorkflowRunRequest(BaseModel):
+    instruction: str | None = Field(default=None, min_length=2, max_length=12000)
+    project_id: UUID | None = None
+    session_key: str | None = Field(default=None, min_length=1, max_length=120)
+    use_memory: bool | None = None
+
+
+class WorkflowRunResponse(BaseModel):
+    workflow_id: UUID
+    workflow_name: str
+    steps: list[AgentRunResponse]
+    final_content: str
+    total_duration_ms: int
+    project_id: UUID | None = None
+    session_key: str | None = None
+    use_memory: bool
 
 
 class WorkflowResponse(BaseModel):
