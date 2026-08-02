@@ -53,6 +53,22 @@ class WorkflowRunResponse(BaseModel):
     use_memory: bool
 
 
+class WorkflowExecutionStepResponse(BaseModel):
+    index: int
+    agent_id: str
+    agent_name: str
+    task: str
+    status: str = "completed"
+    execution_id: UUID | None = None
+    provider: str
+    model: str
+    model_selection_source: str
+    routing_reason: str
+    duration_ms: int
+    memory_items_used: int
+    content: str
+
+
 class WorkflowExecutionResponse(BaseModel):
     id: UUID
     workflow_id: UUID
@@ -67,6 +83,7 @@ class WorkflowExecutionResponse(BaseModel):
     total_duration_ms: int
     final_content: str | None
     error_message: str | None
+    step_details: list[WorkflowExecutionStepResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
