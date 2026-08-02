@@ -5,6 +5,11 @@ from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.agent_repository import AgentRepository
+from app.repositories.asset_repository import AssetRepository
+from app.repositories.benchmark_repository import BenchmarkRepository
+from app.repositories.conversation_repository import ConversationRepository
+from app.repositories.document_chunk_repository import DocumentChunkRepository
+from app.repositories.project_repository import ProjectRepository
 from app.schemas.agents import (
     AgentDescriptorResponse,
     AgentExecutionResponse,
@@ -13,13 +18,33 @@ from app.schemas.agents import (
     AgentRunResponse,
 )
 from app.services.agent_service import AgentService
+from app.services.auto_model_rag_service import AutoModelRagService
 from app.services.chat_providers import ChatProviderError
+from app.services.embedding_service import EmbeddingService
+from app.services.search_service import SemanticSearchService
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 
 
 def get_service(db: Session = Depends(get_db)) -> AgentService:
-    return AgentService(repository=AgentRepository(db))
+    asset_repository = AssetRepository(db)
+    benchmark_repository = BenchmarkRepository(db)
+    search_service = SemanticSearchService(
+        project_repository=ProjectRepository(db),
+        chunk_repository=DocumentChunkRepository(db),
+        embedding_service=EmbeddingService(asset_repository=asset_repository),
+    )
+    rag_service = AutoModelRagService(
+        search_service=search_service,
+        asset_repository=asset_repository,
+        conversation_repository=ConversationRepository(db),
+        benchmark_repository=benchmark_repository,
+    )
+    return AgentService(
+        repository=AgentRepository(db),
+        benchmark_repository=benchmark_repository,
+        rag_service=rag_service,
+    )
 
 
 @router.get("", response_model=list[AgentDescriptorResponse])
@@ -45,12 +70,18 @@ def run_agent(
             instruction=payload.instruction,
             agent_id=payload.agent_id,
             user_id=user.id,
+            project_id=payload.project_id,
             session_key=payload.session_key,
             use_memory=payload.use_memory,
         )
     except KeyError as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(exc),
+        ) from exc
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(exc),
         ) from exc
     except ChatProviderError as exc:
