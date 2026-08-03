@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.routers.agents import router as agents_router
 from app.api.v1.routers.analytics import router as analytics_router
+from app.api.v1.routers.async_workflows import router as async_workflows_router
 from app.api.v1.routers.auth import router as auth_router
 from app.api.v1.routers.auto_model_selection import router as auto_model_selection_router
 from app.api.v1.routers.benchmark import router as benchmark_router
@@ -26,6 +27,7 @@ api_router.include_router(benchmark_router)
 api_router.include_router(analytics_router)
 api_router.include_router(auto_model_selection_router)
 api_router.include_router(agents_router)
+api_router.include_router(async_workflows_router)
 api_router.include_router(workflows_router)
 api_router.include_router(project_documents_router)
 api_router.include_router(project_search_router)
