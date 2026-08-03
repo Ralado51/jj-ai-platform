@@ -247,6 +247,8 @@ def retry_workflow_execution_from_step(
             user_id=user.id,
             workflow_id=workflow.id,
             project_id=project_id,
+            parent_execution_id=previous.id,
+            retry_from_step=payload.step,
             workflow_name=workflow.name,
             status="pending",
             instruction=payload.instruction or previous.instruction,
