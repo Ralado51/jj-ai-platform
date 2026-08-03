@@ -38,7 +38,7 @@ class WorkflowInsightsService:
         step_durations: dict[int, list[int]] = defaultdict(list)
         step_agents: dict[int, tuple[str, str | None]] = {}
         total_step_duration = 0
-        for execution in completed:
+        for execution in terminal:
             for detail in execution.step_details or []:
                 position = int(detail.get("index", 0))
                 duration = int(detail.get("duration_ms", 0))
@@ -56,7 +56,8 @@ class WorkflowInsightsService:
             for position, values in step_durations.items()
             if values
         }
-        bottleneck_step = max(averages, key=averages.get) if averages else None
+        has_multiple_steps = len(averages) > 1
+        bottleneck_step = max(averages, key=averages.get) if has_multiple_steps else None
         bottleneck_share = (
             round((sum(step_durations[bottleneck_step]) / total_step_duration) * 100, 2)
             if bottleneck_step and total_step_duration
