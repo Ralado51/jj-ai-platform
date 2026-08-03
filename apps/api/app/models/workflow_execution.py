@@ -21,6 +21,13 @@ class WorkflowExecution(Base, UUIDPrimaryKeyMixin, TimestampMixin):
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    parent_execution_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_executions.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    retry_from_step: Mapped[int | None] = mapped_column(Integer, nullable=True)
     workflow_name: Mapped[str] = mapped_column(String(150), nullable=False)
     status: Mapped[str] = mapped_column(String(30), nullable=False, default="running", index=True)
     instruction: Mapped[str] = mapped_column(Text, nullable=False)
