@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
+from app.core.config import get_settings
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.benchmark_repository import BenchmarkRepository
@@ -15,11 +16,13 @@ from app.schemas.analytics import (
     WorkflowAnalyticsResponse,
     WorkflowHealthHistoryListResponse,
     WorkflowHealthHistoryResponse,
+    WorkflowHealthRegressionsResponse,
     WorkflowInsightsResponse,
 )
 from app.services.analytics_service import AnalyticsService
 from app.services.model_router import AITaskType
 from app.services.workflow_analytics_service import WorkflowAnalyticsService
+from app.services.workflow_health_regression_service import WorkflowHealthRegressionService
 from app.services.workflow_insights_service import WorkflowInsightsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
@@ -89,3 +92,16 @@ def get_workflow_health_history(
 ) -> WorkflowHealthHistoryListResponse:
     safe_limit = max(1, min(limit, 1000))
     return WorkflowHealthHistoryListResponse(items=repository.list(user_id=user.id, workflow_id=workflow_id, limit=safe_limit))
+
+
+@router.get("/workflows/health/regressions", response_model=WorkflowHealthRegressionsResponse)
+def get_workflow_health_regressions(
+    workflow_id: UUID | None = None,
+    repository: WorkflowHealthHistoryRepository = Depends(get_workflow_health_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowHealthRegressionsResponse:
+    threshold = max(1, get_settings().workflow_health_regression_threshold)
+    return WorkflowHealthRegressionService(repository, threshold=threshold).detect(
+        user_id=user.id,
+        workflow_id=workflow_id,
+    )
