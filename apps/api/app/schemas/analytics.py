@@ -113,3 +113,18 @@ class WorkflowHealthHistoryResponse(BaseModel):
 
 class WorkflowHealthHistoryListResponse(BaseModel):
     items: list[WorkflowHealthHistoryResponse]
+
+
+class WorkflowHealthRegressionResponse(BaseModel):
+    workflow_id: UUID
+    workflow_name: str
+    previous_date: dt.date
+    current_date: dt.date
+    previous_score: int
+    current_score: int
+    delta: int
+    severity: str
+
+
+class WorkflowHealthRegressionsResponse(BaseModel):
+    items: list[WorkflowHealthRegressionResponse]
