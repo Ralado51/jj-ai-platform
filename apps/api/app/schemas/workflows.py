@@ -77,6 +77,8 @@ class WorkflowExecutionResponse(BaseModel):
     id: UUID
     workflow_id: UUID
     project_id: UUID | None
+    parent_execution_id: UUID | None = None
+    retry_from_step: int | None = None
     workflow_name: str
     status: str
     instruction: str
