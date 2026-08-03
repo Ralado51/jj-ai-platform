@@ -14,31 +14,12 @@ from app.models.prompt_template import PromptTemplate
 from app.models.task import Task
 from app.models.user import User, UserRole
 from app.models.workflow_execution import WorkflowExecution
+from app.models.workflow_health_history import WorkflowHealthHistory
 
 __all__ = [
-    "Agent",
-    "AgentExecution",
-    "AgentMemory",
-    "AgentWorkflow",
-    "Asset",
-    "AssetType",
-    "Base",
-    "BenchmarkResult",
-    "BenchmarkRun",
-    "Conversation",
-    "ConversationMessage",
-    "DocumentChunk",
-    "Execution",
-    "ExecutionStatus",
-    "Memory",
-    "MemoryType",
-    "Project",
-    "PromptTemplate",
-    "Task",
-    "TaskType",
-    "TimestampMixin",
-    "UUIDPrimaryKeyMixin",
-    "User",
-    "UserRole",
-    "WorkflowExecution",
+    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "Asset", "AssetType", "Base",
+    "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
+    "Execution", "ExecutionStatus", "Memory", "MemoryType", "Project", "PromptTemplate", "Task",
+    "TaskType", "TimestampMixin", "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowExecution",
+    "WorkflowHealthHistory",
 ]
