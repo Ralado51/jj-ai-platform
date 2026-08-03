@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     auto_model_minimum_samples: int = 3
     auto_model_minimum_average_score: float = 7.0
 
+    workflow_health_snapshot_enabled: bool = True
+    workflow_health_snapshot_interval_seconds: int = 3600
+    workflow_health_regression_threshold: int = 10
+
     rag_retrieval_top_k: int = 10
     rag_max_context_characters: int = 5000
 
