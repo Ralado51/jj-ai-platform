@@ -46,12 +46,57 @@ class NotificationRepository:
         self.db.refresh(item)
         return item
 
-    def list(self, *, user_id: UUID, unread_only: bool = False, limit: int = 100) -> list[Notification]:
+    def _filtered_query(
+        self,
+        *,
+        user_id: UUID,
+        unread_only: bool = False,
+        severity: str | None = None,
+        type: str | None = None,
+    ):
         query = select(Notification).where(Notification.user_id == user_id)
         if unread_only:
             query = query.where(Notification.is_read.is_(False))
-        query = query.order_by(Notification.created_at.desc()).limit(limit)
+        if severity:
+            query = query.where(Notification.severity == severity)
+        if type:
+            query = query.where(Notification.type == type)
+        return query
+
+    def list(
+        self,
+        *,
+        user_id: UUID,
+        unread_only: bool = False,
+        severity: str | None = None,
+        type: str | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> list[Notification]:
+        query = self._filtered_query(
+            user_id=user_id,
+            unread_only=unread_only,
+            severity=severity,
+            type=type,
+        )
+        query = query.order_by(Notification.created_at.desc()).offset(offset).limit(limit)
         return list(self.db.scalars(query).all())
+
+    def count(
+        self,
+        *,
+        user_id: UUID,
+        unread_only: bool = False,
+        severity: str | None = None,
+        type: str | None = None,
+    ) -> int:
+        filtered = self._filtered_query(
+            user_id=user_id,
+            unread_only=unread_only,
+            severity=severity,
+            type=type,
+        ).subquery()
+        return int(self.db.scalar(select(func.count()).select_from(filtered)) or 0)
 
     def unread_count(self, *, user_id: UUID) -> int:
         return int(self.db.scalar(select(func.count()).select_from(Notification).where(Notification.user_id == user_id, Notification.is_read.is_(False))) or 0)
