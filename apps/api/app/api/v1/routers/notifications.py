@@ -1,3 +1,4 @@
+import math
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -19,14 +20,35 @@ def get_repository(db: Session = Depends(get_db)) -> NotificationRepository:
 @router.get("", response_model=NotificationListResponse)
 def list_notifications(
     unread_only: bool = False,
-    limit: int = 100,
+    severity: str | None = None,
+    type: str | None = None,
+    page: int = 1,
+    page_size: int = 20,
     repository: NotificationRepository = Depends(get_repository),
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> NotificationListResponse:
-    safe_limit = max(1, min(limit, 500))
+    safe_page = max(1, page)
+    safe_page_size = max(1, min(page_size, 100))
+    total = repository.count(
+        user_id=user.id,
+        unread_only=unread_only,
+        severity=severity,
+        type=type,
+    )
     return NotificationListResponse(
-        items=repository.list(user_id=user.id, unread_only=unread_only, limit=safe_limit),
+        items=repository.list(
+            user_id=user.id,
+            unread_only=unread_only,
+            severity=severity,
+            type=type,
+            offset=(safe_page - 1) * safe_page_size,
+            limit=safe_page_size,
+        ),
         unread_count=repository.unread_count(user_id=user.id),
+        total=total,
+        page=safe_page,
+        page_size=safe_page_size,
+        total_pages=max(1, math.ceil(total / safe_page_size)),
     )
 
 
