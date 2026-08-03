@@ -9,6 +9,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
 from app.models.execution import Execution
 from app.models.memory import Memory
+from app.models.notification import Notification
 from app.models.project import Project
 from app.models.prompt_template import PromptTemplate
 from app.models.task import Task
@@ -19,7 +20,7 @@ from app.models.workflow_health_history import WorkflowHealthHistory
 __all__ = [
     "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "Asset", "AssetType", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
-    "Execution", "ExecutionStatus", "Memory", "MemoryType", "Project", "PromptTemplate", "Task",
+    "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "Project", "PromptTemplate", "Task",
     "TaskType", "TimestampMixin", "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowExecution",
     "WorkflowHealthHistory",
 ]
