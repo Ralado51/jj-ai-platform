@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 from uuid import UUID
 
 from app.schemas.agents import AgentRunResponse
@@ -20,6 +21,12 @@ class AgentOrchestrationResult:
     total_duration_ms: int
 
 
+class AgentOrchestrationCancelled(RuntimeError):
+    def __init__(self, completed_steps: list[AgentRunResponse]) -> None:
+        super().__init__("workflow execution cancelled")
+        self.completed_steps = completed_steps
+
+
 class AgentOrchestrator:
     """Executes an explicit sequence of agents and forwards each output to the next step."""
 
@@ -35,6 +42,8 @@ class AgentOrchestrator:
         project_id: UUID | None = None,
         session_key: str | None = None,
         use_memory: bool = True,
+        should_cancel: Callable[[], bool] | None = None,
+        on_step_completed: Callable[[int, AgentRunResponse], None] | None = None,
     ) -> AgentOrchestrationResult:
         if not steps:
             raise ValueError("at least one orchestration step is required")
@@ -45,6 +54,9 @@ class AgentOrchestrator:
         results: list[AgentRunResponse] = []
 
         for index, step in enumerate(steps, start=1):
+            if should_cancel is not None and should_cancel():
+                raise AgentOrchestrationCancelled(results.copy())
+
             instruction = self._build_instruction(
                 step_number=index,
                 step_instruction=step.instruction,
@@ -60,6 +72,12 @@ class AgentOrchestrator:
             )
             results.append(result)
             current_content = result.content
+
+            if on_step_completed is not None:
+                on_step_completed(index, result)
+
+            if should_cancel is not None and should_cancel():
+                raise AgentOrchestrationCancelled(results.copy())
 
         return AgentOrchestrationResult(
             steps=results,
