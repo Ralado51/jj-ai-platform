@@ -1,3 +1,8 @@
+from __future__ import annotations
+
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -6,13 +11,31 @@ from app.api.v1.router import api_router
 from app.core.config import get_settings
 from app.db.session import engine
 from app.services.storage import StorageError, get_storage_service
+from app.services.workflow_health_scheduler import run_workflow_health_scheduler
 
 settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    task: asyncio.Task[None] | None = None
+    if settings.workflow_health_snapshot_enabled:
+        interval = max(300, settings.workflow_health_snapshot_interval_seconds)
+        task = asyncio.create_task(run_workflow_health_scheduler(interval))
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="API central da JJ AI Platform.",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
