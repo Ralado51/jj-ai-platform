@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import BaseModel
 
 
@@ -23,3 +25,40 @@ class AIAnalyticsSummaryResponse(BaseModel):
     top_model: str | None
     models: list[ModelAnalyticsResponse]
     winners: list[ModelWinResponse]
+
+
+class WorkflowPerformanceResponse(BaseModel):
+    workflow_id: UUID
+    workflow_name: str
+    executions: int
+    success_rate: float
+    average_duration_ms: int
+
+
+class WorkflowStepPerformanceResponse(BaseModel):
+    agent_id: str
+    agent_name: str
+    position: int
+    executions: int
+    average_duration_ms: int
+
+
+class WorkflowFailurePointResponse(BaseModel):
+    workflow_name: str
+    step: int
+    occurrences: int
+    error_message: str
+
+
+class WorkflowAnalyticsResponse(BaseModel):
+    total_executions: int
+    terminal_executions: int
+    completed_executions: int
+    failed_executions: int
+    cancelled_executions: int
+    retry_executions: int
+    success_rate: float
+    average_duration_ms: int
+    workflows: list[WorkflowPerformanceResponse]
+    slowest_steps: list[WorkflowStepPerformanceResponse]
+    failure_points: list[WorkflowFailurePointResponse]
