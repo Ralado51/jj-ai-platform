@@ -8,10 +8,15 @@ from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.benchmark_repository import BenchmarkRepository
 from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
-from app.schemas.analytics import AIAnalyticsSummaryResponse, WorkflowAnalyticsResponse
+from app.schemas.analytics import (
+    AIAnalyticsSummaryResponse,
+    WorkflowAnalyticsResponse,
+    WorkflowInsightsResponse,
+)
 from app.services.analytics_service import AnalyticsService
 from app.services.model_router import AITaskType
 from app.services.workflow_analytics_service import WorkflowAnalyticsService
+from app.services.workflow_insights_service import WorkflowInsightsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -22,6 +27,10 @@ def get_service(db: Session = Depends(get_db)) -> AnalyticsService:
 
 def get_workflow_service(db: Session = Depends(get_db)) -> WorkflowAnalyticsService:
     return WorkflowAnalyticsService(WorkflowExecutionRepository(db))
+
+
+def get_workflow_insights_service(db: Session = Depends(get_db)) -> WorkflowInsightsService:
+    return WorkflowInsightsService(WorkflowExecutionRepository(db))
 
 
 @router.get("/summary", response_model=AIAnalyticsSummaryResponse)
@@ -44,3 +53,14 @@ def get_workflow_analytics(
     ),
 ) -> WorkflowAnalyticsResponse:
     return service.summary(user_id=user.id, workflow_id=workflow_id)
+
+
+@router.get("/workflows/insights", response_model=WorkflowInsightsResponse)
+def get_workflow_insights(
+    workflow_id: UUID | None = None,
+    service: WorkflowInsightsService = Depends(get_workflow_insights_service),
+    user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> WorkflowInsightsResponse:
+    return service.insights(user_id=user.id, workflow_id=workflow_id)
