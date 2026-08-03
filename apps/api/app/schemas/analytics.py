@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import datetime as dt
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ModelAnalyticsResponse(BaseModel):
@@ -91,3 +92,24 @@ class WorkflowInsightResponse(BaseModel):
 
 class WorkflowInsightsResponse(BaseModel):
     workflows: list[WorkflowInsightResponse]
+
+
+class WorkflowHealthHistoryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    workflow_id: UUID
+    workflow_name: str
+    snapshot_date: dt.date
+    health_score: int
+    health_label: str
+    executions: int
+    success_rate: float
+    retry_rate: float
+    average_duration_ms: int
+    bottleneck_step: int | None = None
+    bottleneck_share: float | None = None
+
+
+class WorkflowHealthHistoryListResponse(BaseModel):
+    items: list[WorkflowHealthHistoryResponse]
