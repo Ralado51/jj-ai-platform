@@ -41,6 +41,10 @@ class WorkflowRunRequest(BaseModel):
     use_memory: bool | None = None
 
 
+class WorkflowRetryFromStepRequest(WorkflowRunRequest):
+    step: int = Field(ge=1, le=6)
+
+
 class WorkflowRunResponse(BaseModel):
     execution_id: UUID
     workflow_id: UUID
