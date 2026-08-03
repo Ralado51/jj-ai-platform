@@ -62,3 +62,32 @@ class WorkflowAnalyticsResponse(BaseModel):
     workflows: list[WorkflowPerformanceResponse]
     slowest_steps: list[WorkflowStepPerformanceResponse]
     failure_points: list[WorkflowFailurePointResponse]
+
+
+class WorkflowRecommendationResponse(BaseModel):
+    code: str
+    severity: str
+    title: str
+    description: str
+    action: str
+    step: int | None = None
+    agent_id: str | None = None
+    model: str | None = None
+
+
+class WorkflowInsightResponse(BaseModel):
+    workflow_id: UUID
+    workflow_name: str
+    health_score: int
+    health_label: str
+    executions: int
+    success_rate: float
+    retry_rate: float
+    average_duration_ms: int
+    bottleneck_step: int | None = None
+    bottleneck_share: float | None = None
+    recommendations: list[WorkflowRecommendationResponse]
+
+
+class WorkflowInsightsResponse(BaseModel):
+    workflows: list[WorkflowInsightResponse]
