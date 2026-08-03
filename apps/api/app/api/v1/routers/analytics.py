@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -5,15 +7,21 @@ from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.benchmark_repository import BenchmarkRepository
-from app.schemas.analytics import AIAnalyticsSummaryResponse
+from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
+from app.schemas.analytics import AIAnalyticsSummaryResponse, WorkflowAnalyticsResponse
 from app.services.analytics_service import AnalyticsService
 from app.services.model_router import AITaskType
+from app.services.workflow_analytics_service import WorkflowAnalyticsService
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 
 def get_service(db: Session = Depends(get_db)) -> AnalyticsService:
     return AnalyticsService(BenchmarkRepository(db))
+
+
+def get_workflow_service(db: Session = Depends(get_db)) -> WorkflowAnalyticsService:
+    return WorkflowAnalyticsService(WorkflowExecutionRepository(db))
 
 
 @router.get("/summary", response_model=AIAnalyticsSummaryResponse)
@@ -25,3 +33,14 @@ def get_summary(
     ),
 ) -> AIAnalyticsSummaryResponse:
     return service.summary(user_id=user.id, task=task)
+
+
+@router.get("/workflows", response_model=WorkflowAnalyticsResponse)
+def get_workflow_analytics(
+    workflow_id: UUID | None = None,
+    service: WorkflowAnalyticsService = Depends(get_workflow_service),
+    user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
+) -> WorkflowAnalyticsResponse:
+    return service.summary(user_id=user.id, workflow_id=workflow_id)
