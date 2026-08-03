@@ -1,3 +1,4 @@
+import datetime as dt
 from uuid import UUID
 
 from fastapi import APIRouter, Depends
@@ -8,9 +9,12 @@ from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.benchmark_repository import BenchmarkRepository
 from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
+from app.repositories.workflow_health_history_repository import WorkflowHealthHistoryRepository
 from app.schemas.analytics import (
     AIAnalyticsSummaryResponse,
     WorkflowAnalyticsResponse,
+    WorkflowHealthHistoryListResponse,
+    WorkflowHealthHistoryResponse,
     WorkflowInsightsResponse,
 )
 from app.services.analytics_service import AnalyticsService
@@ -33,13 +37,15 @@ def get_workflow_insights_service(db: Session = Depends(get_db)) -> WorkflowInsi
     return WorkflowInsightsService(WorkflowExecutionRepository(db))
 
 
+def get_workflow_health_repository(db: Session = Depends(get_db)) -> WorkflowHealthHistoryRepository:
+    return WorkflowHealthHistoryRepository(db)
+
+
 @router.get("/summary", response_model=AIAnalyticsSummaryResponse)
 def get_summary(
     task: AITaskType | None = None,
     service: AnalyticsService = Depends(get_service),
-    user: User = Depends(
-        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
-    ),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> AIAnalyticsSummaryResponse:
     return service.summary(user_id=user.id, task=task)
 
@@ -48,9 +54,7 @@ def get_summary(
 def get_workflow_analytics(
     workflow_id: UUID | None = None,
     service: WorkflowAnalyticsService = Depends(get_workflow_service),
-    user: User = Depends(
-        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
-    ),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> WorkflowAnalyticsResponse:
     return service.summary(user_id=user.id, workflow_id=workflow_id)
 
@@ -59,8 +63,29 @@ def get_workflow_analytics(
 def get_workflow_insights(
     workflow_id: UUID | None = None,
     service: WorkflowInsightsService = Depends(get_workflow_insights_service),
-    user: User = Depends(
-        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
-    ),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
 ) -> WorkflowInsightsResponse:
     return service.insights(user_id=user.id, workflow_id=workflow_id)
+
+
+@router.post("/workflows/health/snapshot", response_model=list[WorkflowHealthHistoryResponse])
+def create_workflow_health_snapshot(
+    workflow_id: UUID | None = None,
+    service: WorkflowInsightsService = Depends(get_workflow_insights_service),
+    repository: WorkflowHealthHistoryRepository = Depends(get_workflow_health_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> list[WorkflowHealthHistoryResponse]:
+    insights = service.insights(user_id=user.id, workflow_id=workflow_id)
+    today = dt.date.today()
+    return [repository.upsert(user_id=user.id, insight=item, snapshot_date=today) for item in insights.workflows]
+
+
+@router.get("/workflows/health/history", response_model=WorkflowHealthHistoryListResponse)
+def get_workflow_health_history(
+    workflow_id: UUID | None = None,
+    limit: int = 365,
+    repository: WorkflowHealthHistoryRepository = Depends(get_workflow_health_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> WorkflowHealthHistoryListResponse:
+    safe_limit = max(1, min(limit, 1000))
+    return WorkflowHealthHistoryListResponse(items=repository.list(user_id=user.id, workflow_id=workflow_id, limit=safe_limit))
