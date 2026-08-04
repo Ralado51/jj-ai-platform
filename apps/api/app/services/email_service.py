@@ -39,6 +39,30 @@ class EmailService:
         )
         self._send(recipient, message)
 
+    def send_notification_test(self, recipient: str) -> None:
+        settings_url = f"{self.settings.frontend_url.rstrip('/')}/settings/notifications"
+        message = EmailMessage()
+        message["Subject"] = "Teste de notificações — JJ AI Platform"
+        message.set_content(
+            "Este é um e-mail de teste da JJ AI Platform.\n\n"
+            "O canal de notificações por e-mail está configurado corretamente.\n\n"
+            f"Gerencie suas preferências em: {settings_url}"
+        )
+        message.add_alternative(
+            f"""
+            <html><body style="font-family:Arial,sans-serif;background:#020617;color:#e2e8f0;padding:32px">
+              <div style="max-width:620px;margin:auto;background:#0f172a;border:1px solid #1d4ed8;border-radius:16px;padding:32px">
+                <p style="margin:0 0 8px;color:#93c5fd;font-weight:700">TESTE DE NOTIFICAÇÃO</p>
+                <h1 style="font-size:22px;margin:0 0 16px">Canal de e-mail configurado</h1>
+                <p style="line-height:1.6;color:#cbd5e1">Este e-mail confirma que a JJ AI Platform consegue enviar notificações para este endereço.</p>
+                <p style="margin:28px 0"><a href="{settings_url}" style="background:#2563eb;color:white;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:700">Ver preferências</a></p>
+              </div>
+            </body></html>
+            """,
+            subtype="html",
+        )
+        self._send(recipient, message)
+
     def send_workflow_health_regression(
         self,
         *,

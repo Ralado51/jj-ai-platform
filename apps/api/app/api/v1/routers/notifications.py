@@ -1,16 +1,23 @@
+import datetime as dt
 import math
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.notification_preference_repository import NotificationPreferenceRepository
 from app.repositories.notification_repository import NotificationRepository
-from app.schemas.notification_preferences import NotificationPreferenceResponse, NotificationPreferenceUpdate
+from app.schemas.notification_preferences import (
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+    NotificationTestEmailResponse,
+)
 from app.schemas.notifications import NotificationListResponse, NotificationMarkAllReadResponse, NotificationResponse
+from app.services.email_service import EmailService
 
 router = APIRouter(prefix="/notifications", tags=["notifications"])
 
@@ -49,6 +56,32 @@ def update_notification_preferences(
         default_email=user.email,
     )
     return NotificationPreferenceResponse.model_validate(item)
+
+
+@router.post("/preferences/test-email", response_model=NotificationTestEmailResponse)
+async def send_notification_test_email(
+    repository: NotificationPreferenceRepository = Depends(get_preference_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+) -> NotificationTestEmailResponse:
+    preference = repository.get_or_create(user_id=user.id, default_email=user.email)
+    recipient = preference.email_address or user.email
+    if not recipient:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Configure an email address before sending a test notification.",
+        )
+    try:
+        await run_in_threadpool(EmailService().send_notification_test, recipient)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to send the test email. Check the SMTP configuration.",
+        ) from exc
+    return NotificationTestEmailResponse(
+        status="sent",
+        recipient=recipient,
+        sent_at=dt.datetime.now(dt.UTC),
+    )
 
 
 @router.get("", response_model=NotificationListResponse)
