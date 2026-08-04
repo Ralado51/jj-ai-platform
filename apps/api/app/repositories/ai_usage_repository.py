@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Integer, func, select
 from sqlalchemy.orm import Session
 
 from app.models.ai_usage import AIUsage
@@ -33,5 +33,5 @@ class AIUsageRepository:
         if model: filters.append(AIUsage.model == model)
         if date_from: filters.append(AIUsage.created_at >= date_from)
         if date_to: filters.append(AIUsage.created_at <= date_to)
-        row = self.db.execute(select(func.count(AIUsage.id), func.coalesce(func.sum(AIUsage.total_tokens), 0), func.coalesce(func.sum(AIUsage.estimated_cost), 0), func.coalesce(func.sum(AIUsage.equivalent_openai_cost - AIUsage.estimated_cost), 0), func.coalesce(func.sum(func.cast(AIUsage.cached_response, int)), 0), func.coalesce(func.avg(AIUsage.latency_ms), 0)).where(*filters)).one()
+        row = self.db.execute(select(func.count(AIUsage.id), func.coalesce(func.sum(AIUsage.total_tokens), 0), func.coalesce(func.sum(AIUsage.estimated_cost), 0), func.coalesce(func.sum(AIUsage.equivalent_openai_cost - AIUsage.estimated_cost), 0), func.coalesce(func.sum(func.cast(AIUsage.cached_response, Integer)), 0), func.coalesce(func.avg(AIUsage.latency_ms), 0)).where(*filters)).one()
         return {"total_requests": int(row[0]), "total_tokens": int(row[1]), "estimated_cost": row[2], "ollama_savings": row[3], "cache_hits": int(row[4]), "average_latency_ms": round(float(row[5]), 2)}
