@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import datetime as dt
+
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 
@@ -10,3 +14,9 @@ class NotificationPreferenceUpdate(BaseModel):
 
 class NotificationPreferenceResponse(NotificationPreferenceUpdate):
     model_config = ConfigDict(from_attributes=True)
+
+
+class NotificationTestEmailResponse(BaseModel):
+    status: str
+    recipient: EmailStr
+    sent_at: dt.datetime
