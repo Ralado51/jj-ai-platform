@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import datetime as dt
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models.ai_usage import AIUsage
-from app.services.ai_usage_service import UsageMeasurement
+
+if TYPE_CHECKING:
+    from app.services.ai_usage_service import UsageMeasurement
 
 
 class AIUsageRepository:
@@ -16,27 +19,7 @@ class AIUsageRepository:
         self.db = db
 
     def create(self, *, measurement: UsageMeasurement, prompt_tokens: int, completion_tokens: int, input_cost: Decimal, output_cost: Decimal, total_cost: Decimal, equivalent_openai_cost: Decimal) -> AIUsage:
-        item = AIUsage(
-            user_id=measurement.user_id,
-            project_id=measurement.project_id,
-            workflow_execution_id=measurement.workflow_execution_id,
-            workflow_step=measurement.workflow_step,
-            agent_id=measurement.agent_id,
-            provider=measurement.provider,
-            model=measurement.model,
-            task=measurement.task,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=prompt_tokens + completion_tokens,
-            estimated_input_cost=input_cost,
-            estimated_output_cost=output_cost,
-            estimated_cost=total_cost,
-            equivalent_openai_cost=equivalent_openai_cost,
-            latency_ms=max(0, measurement.latency_ms),
-            cached_response=measurement.cached_response,
-            request_started_at=measurement.started_at,
-            request_finished_at=measurement.finished_at,
-        )
+        item = AIUsage(user_id=measurement.user_id, project_id=measurement.project_id, workflow_execution_id=measurement.workflow_execution_id, workflow_step=measurement.workflow_step, agent_id=measurement.agent_id, provider=measurement.provider, model=measurement.model, task=measurement.task, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens, total_tokens=prompt_tokens + completion_tokens, estimated_input_cost=input_cost, estimated_output_cost=output_cost, estimated_cost=total_cost, equivalent_openai_cost=equivalent_openai_cost, latency_ms=max(0, measurement.latency_ms), cached_response=measurement.cached_response, request_started_at=measurement.started_at, request_finished_at=measurement.finished_at)
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
@@ -50,19 +33,5 @@ class AIUsageRepository:
         if model: filters.append(AIUsage.model == model)
         if date_from: filters.append(AIUsage.created_at >= date_from)
         if date_to: filters.append(AIUsage.created_at <= date_to)
-        row = self.db.execute(select(
-            func.count(AIUsage.id),
-            func.coalesce(func.sum(AIUsage.total_tokens), 0),
-            func.coalesce(func.sum(AIUsage.estimated_cost), 0),
-            func.coalesce(func.sum(AIUsage.equivalent_openai_cost - AIUsage.estimated_cost), 0),
-            func.coalesce(func.sum(func.cast(AIUsage.cached_response, int)), 0),
-            func.coalesce(func.avg(AIUsage.latency_ms), 0),
-        ).where(*filters)).one()
-        return {
-            "total_requests": int(row[0]),
-            "total_tokens": int(row[1]),
-            "estimated_cost": row[2],
-            "ollama_savings": row[3],
-            "cache_hits": int(row[4]),
-            "average_latency_ms": round(float(row[5]), 2),
-        }
+        row = self.db.execute(select(func.count(AIUsage.id), func.coalesce(func.sum(AIUsage.total_tokens), 0), func.coalesce(func.sum(AIUsage.estimated_cost), 0), func.coalesce(func.sum(AIUsage.equivalent_openai_cost - AIUsage.estimated_cost), 0), func.coalesce(func.sum(func.cast(AIUsage.cached_response, int)), 0), func.coalesce(func.avg(AIUsage.latency_ms), 0)).where(*filters)).one()
+        return {"total_requests": int(row[0]), "total_tokens": int(row[1]), "estimated_cost": row[2], "ollama_savings": row[3], "cache_hits": int(row[4]), "average_latency_ms": round(float(row[5]), 2)}
