@@ -16,6 +16,43 @@ class AIUsageSummaryResponse(BaseModel):
     average_latency_ms: float
 
 
+class AIUsageDashboardSummaryResponse(AIUsageSummaryResponse):
+    cache_hit_rate: float
+
+
+class AIUsageTrendResponse(BaseModel):
+    weekly_request_growth: float
+    weekly_token_growth: float
+    weekly_cost_growth: float
+
+
+class AIUsageTimelinePointResponse(BaseModel):
+    date: dt.date
+    requests: int
+    tokens: int
+    cost: Decimal
+    savings: Decimal
+
+
+class AIUsageBreakdownResponse(BaseModel):
+    key: str
+    requests: int
+    tokens: int
+    cost: Decimal
+    average_latency_ms: float | None = None
+
+
+class AIUsageDashboardResponse(BaseModel):
+    summary: AIUsageDashboardSummaryResponse
+    trends: AIUsageTrendResponse
+    timeline: list[AIUsageTimelinePointResponse]
+    providers: list[AIUsageBreakdownResponse]
+    models: list[AIUsageBreakdownResponse]
+    agents: list[AIUsageBreakdownResponse]
+    projects: list[AIUsageBreakdownResponse]
+    workflows: list[AIUsageBreakdownResponse]
+
+
 class AIUsageRecordRequest(BaseModel):
     provider: str
     model: str
