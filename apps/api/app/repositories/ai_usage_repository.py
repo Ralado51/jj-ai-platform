@@ -25,13 +25,28 @@ class AIUsageRepository:
         self.db.refresh(item)
         return item
 
-    def summary(self, *, user_id: UUID, project_id: UUID | None = None, agent_id: UUID | None = None, provider: str | None = None, model: str | None = None, date_from: dt.datetime | None = None, date_to: dt.datetime | None = None) -> dict:
+    @staticmethod
+    def _filters(*, user_id: UUID, project_id: UUID | None = None, agent_id: UUID | None = None, provider: str | None = None, model: str | None = None, date_from: dt.datetime | None = None, date_to: dt.datetime | None = None) -> list:
         filters = [AIUsage.user_id == user_id]
-        if project_id: filters.append(AIUsage.project_id == project_id)
-        if agent_id: filters.append(AIUsage.agent_id == agent_id)
-        if provider: filters.append(AIUsage.provider == provider)
-        if model: filters.append(AIUsage.model == model)
-        if date_from: filters.append(AIUsage.created_at >= date_from)
-        if date_to: filters.append(AIUsage.created_at <= date_to)
+        if project_id:
+            filters.append(AIUsage.project_id == project_id)
+        if agent_id:
+            filters.append(AIUsage.agent_id == agent_id)
+        if provider:
+            filters.append(AIUsage.provider == provider)
+        if model:
+            filters.append(AIUsage.model == model)
+        if date_from:
+            filters.append(AIUsage.created_at >= date_from)
+        if date_to:
+            filters.append(AIUsage.created_at <= date_to)
+        return filters
+
+    def list(self, *, user_id: UUID, project_id: UUID | None = None, agent_id: UUID | None = None, provider: str | None = None, model: str | None = None, date_from: dt.datetime | None = None, date_to: dt.datetime | None = None) -> list[AIUsage]:
+        filters = self._filters(user_id=user_id, project_id=project_id, agent_id=agent_id, provider=provider, model=model, date_from=date_from, date_to=date_to)
+        return list(self.db.scalars(select(AIUsage).where(*filters).order_by(AIUsage.created_at.asc())).all())
+
+    def summary(self, *, user_id: UUID, project_id: UUID | None = None, agent_id: UUID | None = None, provider: str | None = None, model: str | None = None, date_from: dt.datetime | None = None, date_to: dt.datetime | None = None) -> dict:
+        filters = self._filters(user_id=user_id, project_id=project_id, agent_id=agent_id, provider=provider, model=model, date_from=date_from, date_to=date_to)
         row = self.db.execute(select(func.count(AIUsage.id), func.coalesce(func.sum(AIUsage.total_tokens), 0), func.coalesce(func.sum(AIUsage.estimated_cost), 0), func.coalesce(func.sum(AIUsage.equivalent_openai_cost - AIUsage.estimated_cost), 0), func.coalesce(func.sum(func.cast(AIUsage.cached_response, Integer)), 0), func.coalesce(func.avg(AIUsage.latency_ms), 0)).where(*filters)).one()
         return {"total_requests": int(row[0]), "total_tokens": int(row[1]), "estimated_cost": row[2], "ollama_savings": row[3], "cache_hits": int(row[4]), "average_latency_ms": round(float(row[5]), 2)}
