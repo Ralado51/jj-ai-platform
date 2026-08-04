@@ -1,6 +1,7 @@
 from app.models.agent import Agent
 from app.models.agent_execution import AgentExecution, AgentMemory
 from app.models.agent_workflow import AgentWorkflow
+from app.models.ai_usage import AIUsage
 from app.models.asset import Asset
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.benchmark_run import BenchmarkResult, BenchmarkRun
@@ -20,7 +21,7 @@ from app.models.workflow_execution import WorkflowExecution
 from app.models.workflow_health_history import WorkflowHealthHistory
 
 __all__ = [
-    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "Asset", "AssetType", "Base",
+    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AIUsage", "Asset", "AssetType", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
     "NotificationPreference", "Project", "PromptTemplate", "Task", "TaskType", "TimestampMixin",
