@@ -8,6 +8,7 @@ from app.api.v1.routers.auto_model_selection import router as auto_model_selecti
 from app.api.v1.routers.benchmark import router as benchmark_router
 from app.api.v1.routers.content_creator import router as content_creator_router
 from app.api.v1.routers.conversations import router as conversations_router
+from app.api.v1.routers.cost_analytics import router as cost_analytics_router
 from app.api.v1.routers.documents import documents_router, project_documents_router, project_search_router
 from app.api.v1.routers.notifications import router as notifications_router
 from app.api.v1.routers.projects import router as projects_router
@@ -22,6 +23,7 @@ api_router.include_router(prompt_templates_router)
 api_router.include_router(content_creator_router)
 api_router.include_router(benchmark_router)
 api_router.include_router(analytics_router)
+api_router.include_router(cost_analytics_router)
 api_router.include_router(notifications_router)
 api_router.include_router(auto_model_selection_router)
 api_router.include_router(agents_router)
