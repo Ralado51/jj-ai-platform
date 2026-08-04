@@ -6,6 +6,7 @@ import httpx
 from fastapi import HTTPException, status
 
 from app.core.config import get_settings
+from app.repositories.ai_usage_repository import AIUsageRepository
 from app.repositories.benchmark_repository import BenchmarkRepository
 from app.schemas.content_creator import (
     ContentCreatorBriefing,
@@ -16,14 +17,11 @@ from app.schemas.content_creator import (
     PromptEvaluationScoresResponse,
 )
 from app.services.auto_model_selector import AutoModelSelector
-from app.services.chat_providers import (
-    ChatProvider,
-    ChatProviderError,
-    OllamaChatProvider,
-)
+from app.services.chat_providers import ChatProvider, ChatProviderError, OllamaChatProvider
 from app.services.content_quality_pipeline import ContentQualityPipeline
 from app.services.model_router import AITaskType, ModelRoute, ModelRouter
 from app.services.prompt_engine import PromptEngine
+from app.services.usage_tracking_chat_provider import UsageTrackingChatProvider
 
 
 class ContentCreatorService:
@@ -33,7 +31,9 @@ class ContentCreatorService:
         provider: ChatProvider | None = None,
         model_router: ModelRouter | None = None,
         benchmark_repository: BenchmarkRepository | None = None,
+        usage_repository: AIUsageRepository | None = None,
         user_id: UUID | None = None,
+        project_id: UUID | None = None,
     ) -> None:
         settings = get_settings()
 
@@ -44,7 +44,7 @@ class ContentCreatorService:
                 reason="Provider injetado diretamente no Content Creator.",
                 used_fallback=False,
             )
-            self.provider = provider
+            selected_provider = provider
         else:
             router = model_router or ModelRouter(
                 default_model=settings.ollama_chat_model,
@@ -54,21 +54,13 @@ class ContentCreatorService:
                 summarization_model=settings.ollama_summarization_model,
                 general_model=settings.ollama_general_model,
             )
-
-            if (
-                settings.auto_model_selection_enabled
-                and benchmark_repository is not None
-                and user_id is not None
-            ):
+            if settings.auto_model_selection_enabled and benchmark_repository is not None and user_id is not None:
                 selection = AutoModelSelector(
                     repository=benchmark_repository,
                     router=router,
                     minimum_samples=settings.auto_model_minimum_samples,
                     minimum_average_score=settings.auto_model_minimum_average_score,
-                ).select(
-                    user_id=user_id,
-                    task=AITaskType.CONTENT_GENERATION,
-                )
+                ).select(user_id=user_id, task=AITaskType.CONTENT_GENERATION)
                 self.route = ModelRoute(
                     task=selection.task,
                     model=selection.model,
@@ -77,31 +69,31 @@ class ContentCreatorService:
                 )
             else:
                 self.route = router.route(AITaskType.CONTENT_GENERATION)
-
-            self.provider = OllamaChatProvider(
+            selected_provider = OllamaChatProvider(
                 base_url=settings.ollama_base_url,
                 model=self.route.model,
                 timeout_seconds=settings.ollama_chat_timeout_seconds,
                 temperature=settings.ollama_chat_temperature,
             )
 
+        if usage_repository is not None and user_id is not None:
+            selected_provider = UsageTrackingChatProvider(
+                provider=selected_provider,
+                repository=usage_repository,
+                user_id=user_id,
+                project_id=project_id,
+                task=AITaskType.CONTENT_GENERATION.value,
+            )
+
+        self.provider = selected_provider
         self.prompt_engine = PromptEngine()
         self.pipeline = ContentQualityPipeline(provider=self.provider)
 
     def generate(self, briefing: ContentCreatorBriefing) -> ContentCreatorResponse:
-        prompt = self.prompt_engine.build_content_creator_prompt(
-            briefing=briefing.model_dump()
-        )
-
+        prompt = self.prompt_engine.build_content_creator_prompt(briefing=briefing.model_dump())
         try:
-            original_content = self.provider.generate(
-                system_prompt=prompt.system_prompt,
-                user_prompt=prompt.user_prompt,
-            )
-            result = self.pipeline.process(
-                original_content=original_content,
-                original_prompt=prompt,
-            )
+            original_content = self.provider.generate(system_prompt=prompt.system_prompt, user_prompt=prompt.user_prompt)
+            result = self.pipeline.process(original_content=original_content, original_prompt=prompt)
         except (httpx.HTTPError, ChatProviderError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,
@@ -120,10 +112,7 @@ class ContentCreatorService:
                 used_fallback=self.route.used_fallback,
             ),
             refined=result.refined,
-            validation=ContentValidationResponse(
-                is_valid=result.validation.is_valid,
-                issues=list(result.validation.issues),
-            ),
+            validation=ContentValidationResponse(is_valid=result.validation.is_valid, issues=list(result.validation.issues)),
             evaluation=PromptEvaluationResponse(
                 scores=PromptEvaluationScoresResponse(
                     hook=scores.hook,
