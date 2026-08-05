@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
+from app.events import AIUsageRecorded, DomainEventBus, domain_event_bus
 from app.models.ai_usage import AIUsage
 from app.repositories.ai_cost_budget_repository import AICostBudgetRepository
 from app.repositories.ai_usage_repository import AIUsageRepository
@@ -39,8 +40,9 @@ class UsageMeasurement:
 
 
 class AIUsageService:
-    def __init__(self, repository: AIUsageRepository) -> None:
+    def __init__(self, repository: AIUsageRepository, event_bus: DomainEventBus | None = None) -> None:
         self.repository = repository
+        self.event_bus = event_bus or domain_event_bus
 
     @staticmethod
     def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> tuple[Decimal, Decimal, Decimal]:
@@ -66,6 +68,23 @@ class AIUsageService:
             total_cost=total_cost,
             equivalent_openai_cost=equivalent_cost,
         )
+
+        usage_id = getattr(item, "id", None)
+        if isinstance(usage_id, UUID):
+            self.event_bus.publish(
+                AIUsageRecorded(
+                    usage_id=usage_id,
+                    actor_id=measurement.user_id,
+                    project_id=measurement.project_id,
+                    provider=measurement.provider,
+                    model=measurement.model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    estimated_cost=total_cost,
+                    workflow_execution_id=measurement.workflow_execution_id,
+                    agent_id=measurement.agent_id,
+                )
+            )
 
         db = getattr(self.repository, "db", None)
         if db is not None:
