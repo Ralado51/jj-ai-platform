@@ -15,6 +15,7 @@ from app.api.v1.routers.cost_optimizer import router as cost_optimizer_router
 from app.api.v1.routers.documents import documents_router, project_documents_router, project_search_router
 from app.api.v1.routers.notifications import router as notifications_router
 from app.api.v1.routers.projects import router as projects_router
+from app.api.v1.routers.prompt_evaluations import router as prompt_evaluations_router
 from app.api.v1.routers.prompt_templates import router as prompt_templates_router
 from app.api.v1.routers.resource_versions import router as resource_versions_router
 from app.api.v1.routers.resources import router as resources_router
@@ -25,6 +26,7 @@ api_router.include_router(auth_router)
 api_router.include_router(projects_router)
 api_router.include_router(conversations_router)
 api_router.include_router(prompt_templates_router)
+api_router.include_router(prompt_evaluations_router)
 api_router.include_router(content_creator_router)
 api_router.include_router(benchmark_router)
 api_router.include_router(analytics_router)

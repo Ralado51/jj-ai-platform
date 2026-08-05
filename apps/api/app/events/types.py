@@ -50,6 +50,17 @@ class PromptArchived(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class PromptEvaluationFinished(DomainEvent):
+    evaluation_id: UUID
+    prompt_id: UUID
+    prompt_version: int | None
+    status: str
+    score: float
+    provider: str
+    model: str
+
+
+@dataclass(frozen=True, kw_only=True)
 class WorkflowCreated(DomainEvent):
     owner_id: UUID
     workflow_id: UUID
