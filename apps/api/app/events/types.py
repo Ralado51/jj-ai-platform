@@ -50,6 +50,28 @@ class PromptArchived(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class WorkflowCreated(DomainEvent):
+    owner_id: UUID
+    workflow_id: UUID
+    current_values: dict
+
+
+@dataclass(frozen=True, kw_only=True)
+class WorkflowUpdated(DomainEvent):
+    owner_id: UUID
+    workflow_id: UUID
+    previous_values: dict
+    current_values: dict
+
+
+@dataclass(frozen=True, kw_only=True)
+class WorkflowArchived(DomainEvent):
+    owner_id: UUID
+    workflow_id: UUID
+    current_values: dict
+
+
+@dataclass(frozen=True, kw_only=True)
 class BudgetThresholdCrossed(DomainEvent):
     budget_id: UUID
     budget_name: str
