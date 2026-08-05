@@ -14,6 +14,7 @@ from app.api.v1.routers.cost_budgets import router as cost_budgets_router
 from app.api.v1.routers.cost_optimizer import router as cost_optimizer_router
 from app.api.v1.routers.documents import documents_router, project_documents_router, project_search_router
 from app.api.v1.routers.notifications import router as notifications_router
+from app.api.v1.routers.playground import router as playground_router
 from app.api.v1.routers.projects import router as projects_router
 from app.api.v1.routers.prompt_evaluations import router as prompt_evaluations_router
 from app.api.v1.routers.prompt_templates import router as prompt_templates_router
@@ -35,6 +36,7 @@ api_router.include_router(cost_analytics_router)
 api_router.include_router(cost_optimizer_router)
 api_router.include_router(cost_budgets_router)
 api_router.include_router(notifications_router)
+api_router.include_router(playground_router)
 api_router.include_router(resources_router)
 api_router.include_router(resource_versions_router)
 api_router.include_router(audit_logs_router)
