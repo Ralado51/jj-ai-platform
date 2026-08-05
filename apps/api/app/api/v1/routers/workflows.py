@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import require_roles
 from app.api.v1.routers.agents import get_service as get_agent_service
 from app.db.dependencies import get_db
+from app.events.bus import domain_event_bus
+from app.events.resource_events import ResourceUpserted
 from app.models.agent_workflow import AgentWorkflow
 from app.models.user import User, UserRole
 from app.models.workflow_execution import WorkflowExecution
@@ -33,6 +35,24 @@ def get_repository(db: Session = Depends(get_db)) -> AgentWorkflowRepository:
 
 def get_execution_repository(db: Session = Depends(get_db)) -> WorkflowExecutionRepository:
     return WorkflowExecutionRepository(db)
+
+
+def publish_workflow_resource(workflow: AgentWorkflow) -> None:
+    domain_event_bus.publish(
+        ResourceUpserted(
+            owner_id=workflow.user_id,
+            resource_type="workflow",
+            resource_id=workflow.id,
+            project_id=workflow.project_id,
+            name=workflow.name,
+            description=workflow.description,
+            status="active" if workflow.is_active else "archived",
+            metadata={
+                "steps_count": len(workflow.steps),
+                "use_memory": workflow.use_memory,
+            },
+        )
+    )
 
 
 def serialize_step_details(steps: list[AgentRunResponse]) -> list[dict]:
@@ -212,7 +232,9 @@ def create_workflow(
         session_key=payload.session_key,
         use_memory=payload.use_memory,
     )
-    return repository.create(workflow)
+    workflow = repository.create(workflow)
+    publish_workflow_resource(workflow)
+    return workflow
 
 
 @router.post("/{workflow_id}/run", response_model=WorkflowRunResponse)
@@ -274,7 +296,9 @@ def update_workflow(
         changes["steps"] = [step.model_dump() for step in payload.steps or []]
     for field, value in changes.items():
         setattr(workflow, field, value)
-    return repository.save(workflow)
+    workflow = repository.save(workflow)
+    publish_workflow_resource(workflow)
+    return workflow
 
 
 @router.delete("/{workflow_id}", response_model=WorkflowResponse)
@@ -287,4 +311,6 @@ def archive_workflow(
     if workflow is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
     workflow.is_active = False
-    return repository.save(workflow)
+    workflow = repository.save(workflow)
+    publish_workflow_resource(workflow)
+    return workflow
