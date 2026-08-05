@@ -24,7 +24,7 @@ def _upsert_resource(event: ResourceUpserted) -> None:
             "description": event.description,
             "status": event.status,
             "labels": event.labels,
-            "metadata": event.metadata,
+            "resource_metadata": event.metadata,
         }
         if item is None:
             repository.create(owner_id=event.owner_id, values=values)
