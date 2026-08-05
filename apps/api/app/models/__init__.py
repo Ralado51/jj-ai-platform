@@ -1,6 +1,7 @@
 from app.models.agent import Agent
 from app.models.agent_execution import AgentExecution, AgentMemory
 from app.models.agent_workflow import AgentWorkflow
+from app.models.ai_cost_budget import AICostBudget
 from app.models.ai_cost_recommendation import AICostRecommendation
 from app.models.ai_usage import AIUsage
 from app.models.asset import Asset
@@ -22,7 +23,7 @@ from app.models.workflow_execution import WorkflowExecution
 from app.models.workflow_health_history import WorkflowHealthHistory
 
 __all__ = [
-    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "Base",
+    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
     "NotificationPreference", "Project", "PromptTemplate", "Task", "TaskType", "TimestampMixin",
