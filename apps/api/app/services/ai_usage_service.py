@@ -66,12 +66,15 @@ class AIUsageService:
             total_cost=total_cost,
             equivalent_openai_cost=equivalent_cost,
         )
-        try:
-            AICostBudgetAlertService(
-                budget_repository=AICostBudgetRepository(self.repository.db),
-                notification_repository=NotificationRepository(self.repository.db),
-            ).evaluate(user_id=measurement.user_id)
-        except Exception:
-            # Telemetry persistence must not fail because notification evaluation failed.
-            self.repository.db.rollback()
+
+        db = getattr(self.repository, "db", None)
+        if db is not None:
+            try:
+                AICostBudgetAlertService(
+                    budget_repository=AICostBudgetRepository(db),
+                    notification_repository=NotificationRepository(db),
+                ).evaluate(user_id=measurement.user_id)
+            except Exception:
+                # Telemetry persistence must not fail because notification evaluation failed.
+                db.rollback()
         return item
