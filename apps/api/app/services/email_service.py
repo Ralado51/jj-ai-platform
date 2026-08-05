@@ -97,6 +97,44 @@ class EmailService:
         )
         self._send(recipient, message)
 
+    def send_ai_budget_critical(
+        self,
+        *,
+        recipient: str,
+        budget_name: str,
+        usage_percent: float,
+        current_spend: str,
+        monthly_limit: str,
+    ) -> None:
+        budgets_url = f"{self.settings.frontend_url.rstrip('/')}/analytics/budgets"
+        safe_name = escape(budget_name)
+        message = EmailMessage()
+        message["Subject"] = f"Budget crítico: {budget_name} — JJ AI Platform"
+        message.set_content(
+            f"O budget {budget_name} atingiu {usage_percent:.2f}% do limite mensal.\n\n"
+            f"Consumo atual: US$ {current_spend}\n"
+            f"Limite mensal: US$ {monthly_limit}\n\n"
+            f"Revise o consumo em: {budgets_url}"
+        )
+        message.add_alternative(
+            f"""
+            <html><body style="font-family:Arial,sans-serif;background:#020617;color:#e2e8f0;padding:32px">
+              <div style="max-width:620px;margin:auto;background:#0f172a;border:1px solid #7f1d1d;border-radius:16px;padding:32px">
+                <p style="margin:0 0 8px;color:#fca5a5;font-weight:700">BUDGET CRÍTICO</p>
+                <h1 style="font-size:22px;margin:0 0 16px">{safe_name}</h1>
+                <p style="line-height:1.6;color:#cbd5e1">O consumo atingiu <strong>{usage_percent:.2f}%</strong> do limite mensal.</p>
+                <div style="margin:20px 0;padding:16px;background:#020617;border-radius:10px">
+                  <p style="margin:0 0 8px;color:#cbd5e1">Consumo atual: <strong>US$ {escape(current_spend)}</strong></p>
+                  <p style="margin:0;color:#cbd5e1">Limite mensal: <strong>US$ {escape(monthly_limit)}</strong></p>
+                </div>
+                <p style="margin:28px 0"><a href="{budgets_url}" style="background:#dc2626;color:white;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:700">Ver AI Budgets</a></p>
+              </div>
+            </body></html>
+            """,
+            subtype="html",
+        )
+        self._send(recipient, message)
+
     def _send(self, recipient: str, message: EmailMessage) -> None:
         if not all([self.settings.smtp_host, self.settings.smtp_user, self.settings.smtp_password, self.settings.smtp_from]):
             raise RuntimeError("SMTP configuration is incomplete")
