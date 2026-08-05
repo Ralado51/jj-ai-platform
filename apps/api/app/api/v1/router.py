@@ -3,6 +3,7 @@ from fastapi import APIRouter
 from app.api.v1.routers.agents import router as agents_router
 from app.api.v1.routers.analytics import router as analytics_router
 from app.api.v1.routers.async_workflows import router as async_workflows_router
+from app.api.v1.routers.audit_logs import router as audit_logs_router
 from app.api.v1.routers.auth import router as auth_router
 from app.api.v1.routers.auto_model_selection import router as auto_model_selection_router
 from app.api.v1.routers.benchmark import router as benchmark_router
@@ -31,6 +32,7 @@ api_router.include_router(cost_optimizer_router)
 api_router.include_router(cost_budgets_router)
 api_router.include_router(notifications_router)
 api_router.include_router(resources_router)
+api_router.include_router(audit_logs_router)
 api_router.include_router(auto_model_selection_router)
 api_router.include_router(agents_router)
 api_router.include_router(async_workflows_router)
