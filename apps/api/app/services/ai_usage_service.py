@@ -6,7 +6,10 @@ from decimal import Decimal
 from uuid import UUID
 
 from app.models.ai_usage import AIUsage
+from app.repositories.ai_cost_budget_repository import AICostBudgetRepository
 from app.repositories.ai_usage_repository import AIUsageRepository
+from app.repositories.notification_repository import NotificationRepository
+from app.services.ai_cost_budget_alert_service import AICostBudgetAlertService
 
 MODEL_PRICING_PER_MILLION: dict[str, tuple[Decimal, Decimal]] = {
     "gpt-5": (Decimal("1.25"), Decimal("10.00")),
@@ -54,7 +57,7 @@ class AIUsageService:
         if measurement.provider.lower() == "ollama":
             _, _, equivalent_cost = self.estimate_cost(DEFAULT_EQUIVALENT_MODEL, prompt_tokens, completion_tokens)
             input_cost = output_cost = total_cost = Decimal("0")
-        return self.repository.create(
+        item = self.repository.create(
             measurement=measurement,
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
@@ -63,3 +66,12 @@ class AIUsageService:
             total_cost=total_cost,
             equivalent_openai_cost=equivalent_cost,
         )
+        try:
+            AICostBudgetAlertService(
+                budget_repository=AICostBudgetRepository(self.repository.db),
+                notification_repository=NotificationRepository(self.repository.db),
+            ).evaluate(user_id=measurement.user_id)
+        except Exception:
+            # Telemetry persistence must not fail because notification evaluation failed.
+            self.repository.db.rollback()
+        return item
