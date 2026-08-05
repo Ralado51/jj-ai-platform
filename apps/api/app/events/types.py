@@ -92,6 +92,17 @@ class WorkflowBenchmarkFinished(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class PlaygroundRunFinished(DomainEvent):
+    session_id: UUID
+    run_id: UUID
+    mode: str
+    status: str
+    duration_ms: int
+    provider: str | None
+    model: str | None
+
+
+@dataclass(frozen=True, kw_only=True)
 class BudgetThresholdCrossed(DomainEvent):
     budget_id: UUID
     budget_name: str
