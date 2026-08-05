@@ -1,57 +1,87 @@
-from types import SimpleNamespace
 from uuid import uuid4
 
-from app.api.v1.routers import workflows
-from app.events.bus import DomainEventBus
-from app.events.resource_events import ResourceUpserted
+from app.events import resource_subscribers
+from app.events.types import WorkflowArchived, WorkflowCreated
 
 
-def test_publish_workflow_resource_emits_active_workflow(monkeypatch):
+class _SessionContext:
+    def __enter__(self):
+        return object()
+
+    def __exit__(self, exc_type, exc, traceback):
+        return False
+
+
+class _ResourceRepository:
+    values = None
+
+    def __init__(self, db):
+        self.db = db
+
+    def find_registered(self, **kwargs):
+        return None
+
+    def create(self, *, owner_id, values):
+        type(self).values = {"owner_id": owner_id, **values}
+
+
+def _snapshot(*, active: bool, steps: list[dict], use_memory: bool) -> dict:
+    return {
+        "name": "Content pipeline",
+        "description": "Creates and reviews content",
+        "project_id": None,
+        "steps": steps,
+        "default_instruction": None,
+        "session_key": None,
+        "use_memory": use_memory,
+        "is_active": active,
+    }
+
+
+def test_workflow_created_registers_active_resource(monkeypatch):
+    _ResourceRepository.values = None
+    monkeypatch.setattr(resource_subscribers, "SessionLocal", _SessionContext)
+    monkeypatch.setattr(resource_subscribers, "ResourceRegistryRepository", _ResourceRepository)
     owner_id = uuid4()
     project_id = uuid4()
-    workflow = SimpleNamespace(
-        id=uuid4(),
-        user_id=owner_id,
+    event = WorkflowCreated(
+        actor_id=owner_id,
+        owner_id=owner_id,
         project_id=project_id,
-        name="Content pipeline",
-        description="Creates and reviews content",
-        is_active=True,
-        steps=[{"agent_id": "content-creator"}, {"agent_id": "code-review"}],
-        use_memory=True,
+        workflow_id=uuid4(),
+        current_values=_snapshot(
+            active=True,
+            steps=[{"agent_id": "content-creator"}, {"agent_id": "code-review"}],
+            use_memory=True,
+        ),
     )
-    events = []
-    bus = DomainEventBus(strict=True)
-    bus.subscribe(ResourceUpserted, events.append)
-    monkeypatch.setattr(workflows, "domain_event_bus", bus)
 
-    workflows.publish_workflow_resource(workflow)
+    resource_subscribers._upsert_workflow_resource(event)
 
-    assert len(events) == 1
-    assert events[0].owner_id == owner_id
-    assert events[0].resource_type == "workflow"
-    assert events[0].resource_id == workflow.id
-    assert events[0].project_id == project_id
-    assert events[0].status == "active"
-    assert events[0].metadata == {"steps_count": 2, "use_memory": True}
+    values = _ResourceRepository.values
+    assert values["owner_id"] == owner_id
+    assert values["resource_type"] == "workflow"
+    assert values["resource_id"] == event.workflow_id
+    assert values["project_id"] == project_id
+    assert values["status"] == "active"
+    assert values["resource_metadata"] == {"steps_count": 2, "use_memory": True}
 
 
-def test_publish_workflow_resource_emits_archived_status(monkeypatch):
-    workflow = SimpleNamespace(
-        id=uuid4(),
-        user_id=uuid4(),
+def test_workflow_archived_registers_archived_status(monkeypatch):
+    _ResourceRepository.values = None
+    monkeypatch.setattr(resource_subscribers, "SessionLocal", _SessionContext)
+    monkeypatch.setattr(resource_subscribers, "ResourceRegistryRepository", _ResourceRepository)
+    owner_id = uuid4()
+    event = WorkflowArchived(
+        actor_id=owner_id,
+        owner_id=owner_id,
         project_id=None,
-        name="Archived workflow",
-        description=None,
-        is_active=False,
-        steps=[],
-        use_memory=False,
+        workflow_id=uuid4(),
+        current_values=_snapshot(active=False, steps=[], use_memory=False),
     )
-    events = []
-    bus = DomainEventBus(strict=True)
-    bus.subscribe(ResourceUpserted, events.append)
-    monkeypatch.setattr(workflows, "domain_event_bus", bus)
 
-    workflows.publish_workflow_resource(workflow)
+    resource_subscribers._upsert_workflow_resource(event)
 
-    assert events[0].status == "archived"
-    assert events[0].project_id is None
+    values = _ResourceRepository.values
+    assert values["status"] == "archived"
+    assert values["project_id"] is None

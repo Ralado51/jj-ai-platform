@@ -12,7 +12,14 @@ from uuid import UUID
 from app.db.session import SessionLocal
 from app.events.bus import domain_event_bus
 from app.events.resource_events import ResourceUpserted
-from app.events.types import PromptArchived, PromptCreated, PromptUpdated
+from app.events.types import (
+    PromptArchived,
+    PromptCreated,
+    PromptUpdated,
+    WorkflowArchived,
+    WorkflowCreated,
+    WorkflowUpdated,
+)
 from app.repositories.resource_version_repository import ResourceVersionRepository
 
 _registered = False
@@ -103,6 +110,18 @@ def _record_prompt_version(event: PromptCreated | PromptUpdated | PromptArchived
     )
 
 
+def _record_workflow_version(event: WorkflowCreated | WorkflowUpdated | WorkflowArchived) -> None:
+    _create_version(
+        event_id=event.event_id,
+        owner_id=event.owner_id,
+        project_id=event.project_id,
+        resource_type="workflow",
+        resource_id=event.workflow_id,
+        snapshot=event.current_values,
+        occurred_at=event.occurred_at,
+    )
+
+
 def register_version_subscribers() -> None:
     global _registered
     if _registered:
@@ -111,4 +130,7 @@ def register_version_subscribers() -> None:
     domain_event_bus.subscribe(PromptCreated, _record_prompt_version)
     domain_event_bus.subscribe(PromptUpdated, _record_prompt_version)
     domain_event_bus.subscribe(PromptArchived, _record_prompt_version)
+    domain_event_bus.subscribe(WorkflowCreated, _record_workflow_version)
+    domain_event_bus.subscribe(WorkflowUpdated, _record_workflow_version)
+    domain_event_bus.subscribe(WorkflowArchived, _record_workflow_version)
     _registered = True
