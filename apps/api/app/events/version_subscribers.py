@@ -1,7 +1,13 @@
 from __future__ import annotations
 
+import dataclasses
+import datetime as dt
 import hashlib
 import json
+from decimal import Decimal
+from enum import Enum
+from typing import Any
+from uuid import UUID
 
 from app.db.session import SessionLocal
 from app.events.bus import domain_event_bus
@@ -11,18 +17,38 @@ from app.repositories.resource_version_repository import ResourceVersionReposito
 _registered = False
 
 
+def _json_safe(value: Any) -> Any:
+    if isinstance(value, UUID):
+        return str(value)
+    if isinstance(value, (dt.date, dt.datetime)):
+        return value.isoformat()
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, Enum):
+        return value.value
+    if dataclasses.is_dataclass(value):
+        return _json_safe(dataclasses.asdict(value))
+    if isinstance(value, dict):
+        return {str(key): _json_safe(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_json_safe(item) for item in value]
+    return value
+
+
 def _snapshot(event: ResourceUpserted) -> dict:
-    return {
-        "name": event.name,
-        "description": event.description,
-        "status": event.status,
-        "labels": sorted(event.labels),
-        "metadata": event.metadata,
-    }
+    return _json_safe(
+        {
+            "name": event.name,
+            "description": event.description,
+            "status": event.status,
+            "labels": sorted(event.labels),
+            "metadata": event.metadata,
+        }
+    )
 
 
 def _checksum(snapshot: dict) -> str:
-    encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":"), default=str).encode()
+    encoded = json.dumps(snapshot, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
