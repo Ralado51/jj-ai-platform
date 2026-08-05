@@ -16,6 +16,7 @@ from app.api.v1.routers.documents import documents_router, project_documents_rou
 from app.api.v1.routers.notifications import router as notifications_router
 from app.api.v1.routers.projects import router as projects_router
 from app.api.v1.routers.prompt_templates import router as prompt_templates_router
+from app.api.v1.routers.resource_versions import router as resource_versions_router
 from app.api.v1.routers.resources import router as resources_router
 from app.api.v1.routers.workflows import router as workflows_router
 
@@ -32,6 +33,7 @@ api_router.include_router(cost_optimizer_router)
 api_router.include_router(cost_budgets_router)
 api_router.include_router(notifications_router)
 api_router.include_router(resources_router)
+api_router.include_router(resource_versions_router)
 api_router.include_router(audit_logs_router)
 api_router.include_router(auto_model_selection_router)
 api_router.include_router(agents_router)
