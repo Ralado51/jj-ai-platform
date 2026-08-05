@@ -28,9 +28,24 @@ class WorkflowExecutionFinished(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class PromptCreated(DomainEvent):
+    owner_id: UUID
+    prompt_id: UUID
+    current_values: dict
+
+
+@dataclass(frozen=True, kw_only=True)
 class PromptUpdated(DomainEvent):
+    owner_id: UUID
     prompt_id: UUID
     previous_values: dict
+    current_values: dict
+
+
+@dataclass(frozen=True, kw_only=True)
+class PromptArchived(DomainEvent):
+    owner_id: UUID
+    prompt_id: UUID
     current_values: dict
 
 
