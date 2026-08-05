@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.db.session import engine
 from app.events.audit_subscribers import register_audit_subscribers
 from app.events.resource_subscribers import register_resource_subscribers
+from app.events.version_subscribers import register_version_subscribers
 from app.services.storage import StorageError, get_storage_service
 from app.services.workflow_health_scheduler import run_workflow_health_scheduler
 
@@ -22,6 +23,7 @@ settings = get_settings()
 async def lifespan(_: FastAPI):
     register_audit_subscribers()
     register_resource_subscribers()
+    register_version_subscribers()
     task: asyncio.Task[None] | None = None
     if settings.workflow_health_snapshot_enabled:
         interval = max(300, settings.workflow_health_snapshot_interval_seconds)
