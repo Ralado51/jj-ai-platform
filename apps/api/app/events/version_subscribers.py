@@ -12,6 +12,7 @@ from uuid import UUID
 from app.db.session import SessionLocal
 from app.events.bus import domain_event_bus
 from app.events.resource_events import ResourceUpserted
+from app.events.types import PromptArchived, PromptCreated, PromptUpdated
 from app.repositories.resource_version_repository import ResourceVersionRepository
 
 _registered = False
@@ -52,21 +53,54 @@ def _checksum(snapshot: dict) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _record_resource_version(event: ResourceUpserted) -> None:
-    snapshot = _snapshot(event)
+def _create_version(
+    *,
+    event_id: UUID,
+    owner_id: UUID,
+    project_id: UUID | None,
+    resource_type: str,
+    resource_id: UUID,
+    snapshot: dict,
+    occurred_at: dt.datetime,
+) -> None:
+    safe_snapshot = _json_safe(snapshot)
     with SessionLocal() as db:
         ResourceVersionRepository(db).create_once(
             values={
-                "event_id": event.event_id,
-                "owner_id": event.owner_id,
-                "project_id": event.project_id,
-                "resource_type": event.resource_type,
-                "resource_id": event.resource_id,
-                "snapshot": snapshot,
-                "checksum": _checksum(snapshot),
-                "occurred_at": event.occurred_at,
+                "event_id": event_id,
+                "owner_id": owner_id,
+                "project_id": project_id,
+                "resource_type": resource_type,
+                "resource_id": resource_id,
+                "snapshot": safe_snapshot,
+                "checksum": _checksum(safe_snapshot),
+                "occurred_at": occurred_at,
             }
         )
+
+
+def _record_resource_version(event: ResourceUpserted) -> None:
+    _create_version(
+        event_id=event.event_id,
+        owner_id=event.owner_id,
+        project_id=event.project_id,
+        resource_type=event.resource_type,
+        resource_id=event.resource_id,
+        snapshot=_snapshot(event),
+        occurred_at=event.occurred_at,
+    )
+
+
+def _record_prompt_version(event: PromptCreated | PromptUpdated | PromptArchived) -> None:
+    _create_version(
+        event_id=event.event_id,
+        owner_id=event.owner_id,
+        project_id=event.project_id,
+        resource_type="prompt",
+        resource_id=event.prompt_id,
+        snapshot=event.current_values,
+        occurred_at=event.occurred_at,
+    )
 
 
 def register_version_subscribers() -> None:
@@ -74,4 +108,7 @@ def register_version_subscribers() -> None:
     if _registered:
         return
     domain_event_bus.subscribe(ResourceUpserted, _record_resource_version)
+    domain_event_bus.subscribe(PromptCreated, _record_prompt_version)
+    domain_event_bus.subscribe(PromptUpdated, _record_prompt_version)
+    domain_event_bus.subscribe(PromptArchived, _record_prompt_version)
     _registered = True

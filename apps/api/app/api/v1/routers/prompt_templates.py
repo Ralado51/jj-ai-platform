@@ -1,12 +1,13 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_roles
 from app.db.dependencies import get_db
 from app.models.user import User, UserRole
 from app.repositories.prompt_template_repository import PromptTemplateRepository
+from app.repositories.resource_version_repository import ResourceVersionRepository
 from app.schemas.prompt_template import (
     PromptTemplateCreate,
     PromptTemplateResponse,
@@ -19,6 +20,10 @@ router = APIRouter(prefix="/prompt-templates", tags=["prompt-templates"])
 
 def get_service(db: Session = Depends(get_db)) -> PromptTemplateService:
     return PromptTemplateService(PromptTemplateRepository(db))
+
+
+def get_version_repository(db: Session = Depends(get_db)) -> ResourceVersionRepository:
+    return ResourceVersionRepository(db)
 
 
 @router.post("", response_model=PromptTemplateResponse, status_code=status.HTTP_201_CREATED)
@@ -80,3 +85,24 @@ def archive_prompt_template(
     user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
 ) -> PromptTemplateResponse:
     return service.archive(template_id, user)
+
+
+@router.post("/{template_id}/versions/{version_number}/restore", response_model=PromptTemplateResponse)
+def restore_prompt_template_version(
+    template_id: UUID,
+    version_number: int,
+    service: PromptTemplateService = Depends(get_service),
+    version_repository: ResourceVersionRepository = Depends(get_version_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> PromptTemplateResponse:
+    template = service.get(template_id, user)
+    owner_id = template.owner_id or user.id
+    version = version_repository.get(
+        owner_id=owner_id,
+        resource_type="prompt",
+        resource_id=template_id,
+        version_number=version_number,
+    )
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Prompt version not found.")
+    return service.restore(template_id, version.snapshot, user)
