@@ -11,7 +11,7 @@ from app.events.base import DomainEvent
 logger = logging.getLogger(__name__)
 
 EventT = TypeVar("EventT", bound=DomainEvent)
-EventHandler = Callable[[EventT], None | Awaitable[None]]
+EventHandler = Callable[[DomainEvent], None | Awaitable[None]]
 
 
 class DomainEventBus:
@@ -25,15 +25,15 @@ class DomainEventBus:
         self.strict = strict
         self._handlers: dict[type[DomainEvent], list[EventHandler]] = defaultdict(list)
 
-    def subscribe(self, event_type: type[EventT], handler: EventHandler[EventT]) -> None:
+    def subscribe(self, event_type: type[EventT], handler: Callable[[EventT], None | Awaitable[None]]) -> None:
         handlers = self._handlers[event_type]
         if handler not in handlers:
-            handlers.append(handler)
+            handlers.append(handler)  # type: ignore[arg-type]
 
-    def unsubscribe(self, event_type: type[EventT], handler: EventHandler[EventT]) -> None:
+    def unsubscribe(self, event_type: type[EventT], handler: Callable[[EventT], None | Awaitable[None]]) -> None:
         handlers = self._handlers.get(event_type, [])
         if handler in handlers:
-            handlers.remove(handler)
+            handlers.remove(handler)  # type: ignore[arg-type]
 
     def clear(self) -> None:
         self._handlers.clear()
