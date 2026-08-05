@@ -23,6 +23,7 @@ from app.models.resource_registry import ResourceFavorite, ResourceRegistry
 from app.models.resource_version import ResourceVersion
 from app.models.task import Task
 from app.models.user import User, UserRole
+from app.models.workflow_benchmark import WorkflowBenchmark
 from app.models.workflow_execution import WorkflowExecution
 from app.models.workflow_health_history import WorkflowHealthHistory
 
@@ -31,5 +32,5 @@ __all__ = [
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
     "NotificationPreference", "Project", "PromptEvaluation", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "ResourceVersion", "Task", "TaskType", "TimestampMixin",
-    "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowExecution", "WorkflowHealthHistory",
+    "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowBenchmark", "WorkflowExecution", "WorkflowHealthHistory",
 ]
