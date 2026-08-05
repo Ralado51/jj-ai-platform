@@ -3,7 +3,14 @@ from __future__ import annotations
 from app.db.session import SessionLocal
 from app.events.bus import domain_event_bus
 from app.events.resource_events import ResourceRemoved, ResourceUpserted
-from app.events.types import PromptArchived, PromptCreated, PromptUpdated
+from app.events.types import (
+    PromptArchived,
+    PromptCreated,
+    PromptUpdated,
+    WorkflowArchived,
+    WorkflowCreated,
+    WorkflowUpdated,
+)
 from app.repositories.resource_registry_repository import ResourceRegistryRepository
 
 _registered = False
@@ -73,6 +80,34 @@ def _upsert_prompt_resource(event: PromptCreated | PromptUpdated | PromptArchive
             repository.update(item=item, values=values)
 
 
+def _upsert_workflow_resource(event: WorkflowCreated | WorkflowUpdated | WorkflowArchived) -> None:
+    snapshot = event.current_values
+    with SessionLocal() as db:
+        repository = ResourceRegistryRepository(db)
+        item = repository.find_registered(
+            owner_id=event.owner_id,
+            resource_type="workflow",
+            resource_id=event.workflow_id,
+        )
+        values = {
+            "resource_type": "workflow",
+            "resource_id": event.workflow_id,
+            "project_id": event.project_id,
+            "name": snapshot["name"],
+            "description": snapshot.get("description"),
+            "status": "active" if snapshot.get("is_active", True) else "archived",
+            "labels": [],
+            "resource_metadata": {
+                "steps_count": len(snapshot.get("steps", [])),
+                "use_memory": snapshot.get("use_memory", True),
+            },
+        }
+        if item is None:
+            repository.create(owner_id=event.owner_id, values=values)
+        else:
+            repository.update(item=item, values=values)
+
+
 def register_resource_subscribers() -> None:
     global _registered
     if _registered:
@@ -82,4 +117,7 @@ def register_resource_subscribers() -> None:
     domain_event_bus.subscribe(PromptCreated, _upsert_prompt_resource)
     domain_event_bus.subscribe(PromptUpdated, _upsert_prompt_resource)
     domain_event_bus.subscribe(PromptArchived, _upsert_prompt_resource)
+    domain_event_bus.subscribe(WorkflowCreated, _upsert_workflow_resource)
+    domain_event_bus.subscribe(WorkflowUpdated, _upsert_workflow_resource)
+    domain_event_bus.subscribe(WorkflowArchived, _upsert_workflow_resource)
     _registered = True
