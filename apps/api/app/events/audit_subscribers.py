@@ -82,7 +82,7 @@ def _record_audit_log(event: DomainEvent) -> None:
                 "event_id": event.event_id,
                 "event_name": event.event_name,
                 "action": _action(event, repository, entity_type, entity_id),
-                "actor_id": event.actor_id,
+                "actor_id": event.actor_id or getattr(event, "owner_id", None),
                 "project_id": event.project_id,
                 "entity_type": entity_type,
                 "entity_id": entity_id,
