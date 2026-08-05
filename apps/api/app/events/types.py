@@ -83,6 +83,15 @@ class WorkflowArchived(DomainEvent):
 
 
 @dataclass(frozen=True, kw_only=True)
+class WorkflowBenchmarkFinished(DomainEvent):
+    benchmark_id: UUID
+    workflow_id: UUID
+    status: str
+    candidate_versions: tuple[int, ...]
+    winner_version: int | None
+
+
+@dataclass(frozen=True, kw_only=True)
 class BudgetThresholdCrossed(DomainEvent):
     budget_id: UUID
     budget_name: str
