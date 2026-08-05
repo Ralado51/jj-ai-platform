@@ -6,7 +6,10 @@ from app.events.types import (
     PromptArchived,
     PromptCreated,
     PromptUpdated,
+    WorkflowArchived,
+    WorkflowCreated,
     WorkflowExecutionFinished,
+    WorkflowUpdated,
 )
 
 __all__ = [
@@ -17,6 +20,9 @@ __all__ = [
     "PromptArchived",
     "PromptCreated",
     "PromptUpdated",
+    "WorkflowArchived",
+    "WorkflowCreated",
     "WorkflowExecutionFinished",
+    "WorkflowUpdated",
     "domain_event_bus",
 ]
