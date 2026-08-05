@@ -13,6 +13,14 @@ class NotificationRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def get_by_deduplication_key(self, *, user_id: UUID, deduplication_key: str) -> Notification | None:
+        return self.db.scalar(
+            select(Notification).where(
+                Notification.user_id == user_id,
+                Notification.deduplication_key == deduplication_key,
+            )
+        )
+
     def create_if_absent(
         self,
         *,
@@ -24,12 +32,7 @@ class NotificationRepository:
         deduplication_key: str,
         workflow_id: UUID | None = None,
     ) -> Notification:
-        item = self.db.scalar(
-            select(Notification).where(
-                Notification.user_id == user_id,
-                Notification.deduplication_key == deduplication_key,
-            )
-        )
+        item = self.get_by_deduplication_key(user_id=user_id, deduplication_key=deduplication_key)
         if item is not None:
             return item
         item = Notification(
