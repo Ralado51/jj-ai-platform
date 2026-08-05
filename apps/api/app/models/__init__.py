@@ -16,6 +16,7 @@ from app.models.memory import Memory
 from app.models.notification import Notification
 from app.models.notification_email_delivery import NotificationEmailDelivery
 from app.models.notification_preference import NotificationPreference
+from app.models.playground import PlaygroundRun, PlaygroundSession
 from app.models.project import Project
 from app.models.prompt_evaluation import PromptEvaluation
 from app.models.prompt_template import PromptTemplate
@@ -31,6 +32,6 @@ __all__ = [
     "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "AuditLog", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
-    "NotificationPreference", "Project", "PromptEvaluation", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "ResourceVersion", "Task", "TaskType", "TimestampMixin",
+    "NotificationPreference", "PlaygroundRun", "PlaygroundSession", "Project", "PromptEvaluation", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "ResourceVersion", "Task", "TaskType", "TimestampMixin",
     "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowBenchmark", "WorkflowExecution", "WorkflowHealthHistory",
 ]
