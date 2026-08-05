@@ -7,11 +7,12 @@ from app.api.dependencies.auth import require_roles
 from app.api.v1.routers.agents import get_service as get_agent_service
 from app.db.dependencies import get_db
 from app.events.bus import domain_event_bus
-from app.events.resource_events import ResourceUpserted
+from app.events.types import WorkflowArchived, WorkflowCreated, WorkflowUpdated
 from app.models.agent_workflow import AgentWorkflow
 from app.models.user import User, UserRole
 from app.models.workflow_execution import WorkflowExecution
 from app.repositories.agent_workflow_repository import AgentWorkflowRepository
+from app.repositories.resource_version_repository import ResourceVersionRepository
 from app.repositories.workflow_execution_repository import WorkflowExecutionRepository
 from app.schemas.agents import AgentRunResponse
 from app.schemas.workflows import (
@@ -37,22 +38,48 @@ def get_execution_repository(db: Session = Depends(get_db)) -> WorkflowExecution
     return WorkflowExecutionRepository(db)
 
 
-def publish_workflow_resource(workflow: AgentWorkflow) -> None:
+def get_version_repository(db: Session = Depends(get_db)) -> ResourceVersionRepository:
+    return ResourceVersionRepository(db)
+
+
+def workflow_snapshot(workflow: AgentWorkflow) -> dict:
+    return {
+        "name": workflow.name,
+        "description": workflow.description,
+        "project_id": workflow.project_id,
+        "steps": [dict(step) for step in workflow.steps],
+        "default_instruction": workflow.default_instruction,
+        "session_key": workflow.session_key,
+        "use_memory": workflow.use_memory,
+        "is_active": workflow.is_active,
+    }
+
+
+def apply_workflow_update(
+    *,
+    workflow: AgentWorkflow,
+    payload: WorkflowUpdate,
+    repository: AgentWorkflowRepository,
+    user: User,
+) -> AgentWorkflow:
+    previous_values = workflow_snapshot(workflow)
+    changes = payload.model_dump(exclude_unset=True)
+    if "steps" in changes:
+        changes["steps"] = [step.model_dump() for step in payload.steps or []]
+    for field, value in changes.items():
+        setattr(workflow, field, value)
+    workflow = repository.save(workflow)
     domain_event_bus.publish(
-        ResourceUpserted(
+        WorkflowUpdated(
+            actor_id=user.id,
             owner_id=workflow.user_id,
-            resource_type="workflow",
-            resource_id=workflow.id,
             project_id=workflow.project_id,
-            name=workflow.name,
-            description=workflow.description,
-            status="active" if workflow.is_active else "archived",
-            metadata={
-                "steps_count": len(workflow.steps),
-                "use_memory": workflow.use_memory,
-            },
+            workflow_id=workflow.id,
+            previous_values=previous_values,
+            current_values=workflow_snapshot(workflow),
         )
     )
+    return workflow
 
 
 def serialize_step_details(steps: list[AgentRunResponse]) -> list[dict]:
@@ -233,7 +260,15 @@ def create_workflow(
         use_memory=payload.use_memory,
     )
     workflow = repository.create(workflow)
-    publish_workflow_resource(workflow)
+    domain_event_bus.publish(
+        WorkflowCreated(
+            actor_id=user.id,
+            owner_id=workflow.user_id,
+            project_id=workflow.project_id,
+            workflow_id=workflow.id,
+            current_values=workflow_snapshot(workflow),
+        )
+    )
     return workflow
 
 
@@ -269,6 +304,39 @@ def run_workflow(
     )
 
 
+@router.post("/{workflow_id}/versions/{version_number}/restore", response_model=WorkflowResponse)
+def restore_workflow_version(
+    workflow_id: UUID,
+    version_number: int,
+    repository: AgentWorkflowRepository = Depends(get_repository),
+    version_repository: ResourceVersionRepository = Depends(get_version_repository),
+    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER)),
+) -> WorkflowResponse:
+    workflow = repository.get(workflow_id=workflow_id, user_id=user.id)
+    if workflow is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
+    version = version_repository.get(
+        owner_id=workflow.user_id,
+        resource_type="workflow",
+        resource_id=workflow_id,
+        version_number=version_number,
+    )
+    if version is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow version not found.")
+    allowed_fields = {
+        "name",
+        "description",
+        "project_id",
+        "steps",
+        "default_instruction",
+        "session_key",
+        "use_memory",
+        "is_active",
+    }
+    payload = WorkflowUpdate(**{key: value for key, value in version.snapshot.items() if key in allowed_fields})
+    return apply_workflow_update(workflow=workflow, payload=payload, repository=repository, user=user)
+
+
 @router.get("/{workflow_id}", response_model=WorkflowResponse)
 def get_workflow(
     workflow_id: UUID,
@@ -291,14 +359,7 @@ def update_workflow(
     workflow = repository.get(workflow_id=workflow_id, user_id=user.id)
     if workflow is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
-    changes = payload.model_dump(exclude_unset=True)
-    if "steps" in changes:
-        changes["steps"] = [step.model_dump() for step in payload.steps or []]
-    for field, value in changes.items():
-        setattr(workflow, field, value)
-    workflow = repository.save(workflow)
-    publish_workflow_resource(workflow)
-    return workflow
+    return apply_workflow_update(workflow=workflow, payload=payload, repository=repository, user=user)
 
 
 @router.delete("/{workflow_id}", response_model=WorkflowResponse)
@@ -312,5 +373,13 @@ def archive_workflow(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workflow não encontrado.")
     workflow.is_active = False
     workflow = repository.save(workflow)
-    publish_workflow_resource(workflow)
+    domain_event_bus.publish(
+        WorkflowArchived(
+            actor_id=user.id,
+            owner_id=workflow.user_id,
+            project_id=workflow.project_id,
+            workflow_id=workflow.id,
+            current_values=workflow_snapshot(workflow),
+        )
+    )
     return workflow
