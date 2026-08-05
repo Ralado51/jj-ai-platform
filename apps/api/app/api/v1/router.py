@@ -19,6 +19,7 @@ from app.api.v1.routers.prompt_evaluations import router as prompt_evaluations_r
 from app.api.v1.routers.prompt_templates import router as prompt_templates_router
 from app.api.v1.routers.resource_versions import router as resource_versions_router
 from app.api.v1.routers.resources import router as resources_router
+from app.api.v1.routers.workflow_benchmarks import router as workflow_benchmarks_router
 from app.api.v1.routers.workflows import router as workflows_router
 
 api_router = APIRouter()
@@ -41,6 +42,7 @@ api_router.include_router(auto_model_selection_router)
 api_router.include_router(agents_router)
 api_router.include_router(async_workflows_router)
 api_router.include_router(workflows_router)
+api_router.include_router(workflow_benchmarks_router)
 api_router.include_router(project_documents_router)
 api_router.include_router(project_search_router)
 api_router.include_router(documents_router)
