@@ -3,6 +3,7 @@ from app.events.bus import DomainEventBus, domain_event_bus
 from app.events.types import (
     AIUsageRecorded,
     BudgetThresholdCrossed,
+    PlaygroundRunFinished,
     PromptArchived,
     PromptCreated,
     PromptEvaluationFinished,
@@ -19,6 +20,7 @@ __all__ = [
     "BudgetThresholdCrossed",
     "DomainEvent",
     "DomainEventBus",
+    "PlaygroundRunFinished",
     "PromptArchived",
     "PromptCreated",
     "PromptEvaluationFinished",
