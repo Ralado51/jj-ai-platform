@@ -19,6 +19,7 @@ from app.models.notification_preference import NotificationPreference
 from app.models.project import Project
 from app.models.prompt_template import PromptTemplate
 from app.models.resource_registry import ResourceFavorite, ResourceRegistry
+from app.models.resource_version import ResourceVersion
 from app.models.task import Task
 from app.models.user import User, UserRole
 from app.models.workflow_execution import WorkflowExecution
@@ -28,6 +29,6 @@ __all__ = [
     "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "AuditLog", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
-    "NotificationPreference", "Project", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "Task", "TaskType", "TimestampMixin",
+    "NotificationPreference", "Project", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "ResourceVersion", "Task", "TaskType", "TimestampMixin",
     "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowExecution", "WorkflowHealthHistory",
 ]
