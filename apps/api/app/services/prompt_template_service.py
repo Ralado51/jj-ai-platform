@@ -2,6 +2,8 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 
+from app.events.bus import DomainEventBus, domain_event_bus
+from app.events.types import PromptArchived, PromptCreated, PromptUpdated
 from app.models.prompt_template import PromptTemplate
 from app.models.user import User, UserRole
 from app.repositories.prompt_template_repository import PromptTemplateRepository
@@ -9,8 +11,13 @@ from app.schemas.prompt_template import PromptTemplateCreate, PromptTemplateUpda
 
 
 class PromptTemplateService:
-    def __init__(self, repository: PromptTemplateRepository) -> None:
+    def __init__(
+        self,
+        repository: PromptTemplateRepository,
+        event_bus: DomainEventBus = domain_event_bus,
+    ) -> None:
         self.repository = repository
+        self.event_bus = event_bus
 
     def create(self, data: PromptTemplateCreate, user: User) -> PromptTemplate:
         if data.is_public and user.role != UserRole.ADMIN:
@@ -18,7 +25,17 @@ class PromptTemplateService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Somente administradores podem criar templates públicos.",
             )
-        return self.repository.create(data, owner_id=user.id)
+        template = self.repository.create(data, owner_id=user.id)
+        self.event_bus.publish(
+            PromptCreated(
+                actor_id=user.id,
+                owner_id=user.id,
+                project_id=template.project_id,
+                prompt_id=template.id,
+                current_values=self._snapshot(template),
+            )
+        )
+        return template
 
     def list(
         self,
@@ -58,13 +75,64 @@ class PromptTemplateService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Somente administradores podem publicar templates.",
             )
-        return self.repository.update(template, data)
+        previous_values = self._snapshot(template)
+        template = self.repository.update(template, data)
+        self.event_bus.publish(
+            PromptUpdated(
+                actor_id=user.id,
+                owner_id=template.owner_id or user.id,
+                project_id=template.project_id,
+                prompt_id=template.id,
+                previous_values=previous_values,
+                current_values=self._snapshot(template),
+            )
+        )
+        return template
 
     def archive(self, template_id: UUID, user: User) -> PromptTemplate:
         template = self.get(template_id, user)
         if not self._can_manage(template, user):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sem permissão para arquivar este template.")
-        return self.repository.archive(template)
+        template = self.repository.archive(template)
+        self.event_bus.publish(
+            PromptArchived(
+                actor_id=user.id,
+                owner_id=template.owner_id or user.id,
+                project_id=template.project_id,
+                prompt_id=template.id,
+                current_values=self._snapshot(template),
+            )
+        )
+        return template
+
+    def restore(self, template_id: UUID, snapshot: dict, user: User) -> PromptTemplate:
+        allowed_fields = {
+            "name",
+            "description",
+            "category",
+            "content",
+            "variables",
+            "is_public",
+            "is_favorite",
+            "is_active",
+            "metadata",
+        }
+        payload = PromptTemplateUpdate(**{key: value for key, value in snapshot.items() if key in allowed_fields})
+        return self.update(template_id, payload, user)
+
+    @staticmethod
+    def _snapshot(template: PromptTemplate) -> dict:
+        return {
+            "name": template.name,
+            "description": template.description,
+            "category": template.category,
+            "content": template.content,
+            "variables": list(template.variables),
+            "is_public": template.is_public,
+            "is_favorite": template.is_favorite,
+            "is_active": template.is_active,
+            "metadata": dict(template.metadata_),
+        }
 
     @staticmethod
     def _can_read(template: PromptTemplate, user: User) -> bool:
