@@ -5,6 +5,7 @@ from app.models.ai_cost_budget import AICostBudget
 from app.models.ai_cost_recommendation import AICostRecommendation
 from app.models.ai_usage import AIUsage
 from app.models.asset import Asset
+from app.models.audit_log import AuditLog
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
 from app.models.benchmark_run import BenchmarkResult, BenchmarkRun
 from app.models.conversation import Conversation, ConversationMessage
@@ -24,7 +25,7 @@ from app.models.workflow_execution import WorkflowExecution
 from app.models.workflow_health_history import WorkflowHealthHistory
 
 __all__ = [
-    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "Base",
+    "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "AuditLog", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
     "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
     "NotificationPreference", "Project", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "Task", "TaskType", "TimestampMixin",
