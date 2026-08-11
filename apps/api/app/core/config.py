@@ -69,6 +69,14 @@ class Settings(BaseSettings):
     openai_embedding_dimensions: int = 1536
     openai_timeout_seconds: float = 60.0
 
+    hf_token: str = ""
+    hf_image_provider: str = "auto"
+    hf_image_model: str = "Tongyi-MAI/Z-Image-Turbo"
+    gemini_api_key: str = ""
+    gemini_image_model: str = "gemini-3.1-flash-lite-image"
+    image_generation_timeout_seconds: float = 180.0
+    image_generation_batch_concurrency: int = 2
+
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
