@@ -13,6 +13,7 @@ from app.api.v1.routers.cost_analytics import router as cost_analytics_router
 from app.api.v1.routers.cost_budgets import router as cost_budgets_router
 from app.api.v1.routers.cost_optimizer import router as cost_optimizer_router
 from app.api.v1.routers.documents import documents_router, project_documents_router, project_search_router
+from app.api.v1.routers.image_generation import router as image_generation_router
 from app.api.v1.routers.notifications import router as notifications_router
 from app.api.v1.routers.playground import router as playground_router
 from app.api.v1.routers.projects import router as projects_router
@@ -37,6 +38,7 @@ api_router.include_router(cost_optimizer_router)
 api_router.include_router(cost_budgets_router)
 api_router.include_router(notifications_router)
 api_router.include_router(playground_router)
+api_router.include_router(image_generation_router)
 api_router.include_router(resources_router)
 api_router.include_router(resource_versions_router)
 api_router.include_router(audit_logs_router)
