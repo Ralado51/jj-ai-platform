@@ -45,6 +45,7 @@ class ImageJobResponse(BaseModel):
     status: ImageJobStatus
     worker_id: str | None
     asset_id: UUID | None
+    asset_url: str | None
     error: str | None
     created_at: datetime
     updated_at: datetime

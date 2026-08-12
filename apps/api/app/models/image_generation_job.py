@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy import ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin, UUIDPrimaryKeyMixin
+
+if TYPE_CHECKING:
+    from app.models.asset import Asset
 
 
 class ImageGenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
@@ -24,3 +28,9 @@ class ImageGenerationJob(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     worker_id: Mapped[str | None] = mapped_column(String(150), nullable=True, index=True)
     asset_id: Mapped[UUID | None] = mapped_column(ForeignKey("assets.id", ondelete="SET NULL"), nullable=True, index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    asset: Mapped["Asset | None"] = relationship(foreign_keys=[asset_id], lazy="joined")
+
+    @property
+    def asset_url(self) -> str | None:
+        return self.asset.public_url if self.asset else None
