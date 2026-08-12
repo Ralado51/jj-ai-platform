@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.asset import Asset
 from app.models.image_generation_job import ImageGenerationJob
 from app.models.image_worker import ImageWorker
 
@@ -66,7 +67,11 @@ class ImageWorkerRepository:
         self.db.refresh(job)
         return job
 
-    def get_claimed_job(self, job_id: UUID, worker_id: UUID) -> ImageGenerationJob | None:
+    def get_claimed_job(
+        self,
+        job_id: UUID,
+        worker_id: UUID,
+    ) -> ImageGenerationJob | None:
         stmt = select(ImageGenerationJob).where(
             ImageGenerationJob.id == job_id,
             ImageGenerationJob.worker_id == str(worker_id),
@@ -74,7 +79,24 @@ class ImageWorkerRepository:
         )
         return self.db.scalar(stmt)
 
-    def save_job(self, job: ImageGenerationJob) -> ImageGenerationJob:
+    def complete_job(
+        self,
+        job: ImageGenerationJob,
+        asset: Asset,
+    ) -> ImageGenerationJob:
+        self.db.add(asset)
+        self.db.flush()
+        job.asset_id = asset.id
+        job.status = "generated"
+        job.error = None
+        self.db.add(job)
+        self.db.commit()
+        self.db.refresh(job)
+        return job
+
+    def fail_job(self, job: ImageGenerationJob, error: str) -> ImageGenerationJob:
+        job.status = "failed"
+        job.error = error
         self.db.add(job)
         self.db.commit()
         self.db.refresh(job)
