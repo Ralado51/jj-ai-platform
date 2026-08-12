@@ -3,7 +3,6 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models.image_generation_job import ImageGenerationJob
 from app.schemas.image_jobs import ImageJobBatchCreate, ImageJobCreate
 from app.services.image_generation_job_service import ImageGenerationJobService
 
@@ -12,13 +11,19 @@ class FakeRepository:
     def __init__(self) -> None:
         self.jobs: dict = {}
 
+    def _ensure_id(self, job):
+        if job.id is None:
+            job.id = uuid4()
+        return job
+
     def create(self, job):
+        job = self._ensure_id(job)
         self.jobs[job.id] = job
         return job
 
     def create_many(self, jobs):
         for job in jobs:
-            self.jobs[job.id] = job
+            self.create(job)
         return jobs
 
     def get(self, job_id, owner_id):
