@@ -15,14 +15,22 @@ class ImageGenerationJobService:
 
     def create(self, owner_id: UUID, payload: ImageJobCreate) -> ImageGenerationJob:
         return self.repository.create(
-            ImageGenerationJob(owner_id=owner_id, **payload.model_dump())
+            ImageGenerationJob(
+                owner_id=owner_id,
+                status="pending",
+                **payload.model_dump(),
+            )
         )
 
     def create_batch(
         self, owner_id: UUID, payload: ImageJobBatchCreate
     ) -> list[ImageGenerationJob]:
         jobs = [
-            ImageGenerationJob(owner_id=owner_id, **item.model_dump())
+            ImageGenerationJob(
+                owner_id=owner_id,
+                status="pending",
+                **item.model_dump(),
+            )
             for item in payload.items
         ]
         return self.repository.create_many(jobs)
@@ -30,8 +38,27 @@ class ImageGenerationJobService:
     def get(self, job_id: UUID, owner_id: UUID) -> ImageGenerationJob:
         job = self.repository.get(job_id=job_id, owner_id=owner_id)
         if not job:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image job not found.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Image job not found.",
+            )
         return job
+
+    def list(
+        self,
+        owner_id: UUID,
+        status_filter: str | None = None,
+        project_id: UUID | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[ImageGenerationJob]:
+        return self.repository.list(
+            owner_id=owner_id,
+            status=status_filter,
+            project_id=project_id,
+            offset=offset,
+            limit=limit,
+        )
 
     def review(self, job_id: UUID, owner_id: UUID, action: str) -> ImageGenerationJob:
         job = self.get(job_id=job_id, owner_id=owner_id)
