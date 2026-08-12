@@ -50,7 +50,10 @@ class ImageWorkerRepository:
     def claim_next_job(self, worker: ImageWorker) -> ImageGenerationJob | None:
         stmt = (
             select(ImageGenerationJob)
-            .where(ImageGenerationJob.status == "pending")
+            .where(
+                ImageGenerationJob.status == "pending",
+                ImageGenerationJob.model == worker.model,
+            )
             .order_by(ImageGenerationJob.created_at.asc())
             .with_for_update(skip_locked=True)
             .limit(1)
