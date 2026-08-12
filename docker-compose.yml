@@ -110,6 +110,7 @@ services:
       GEMINI_IMAGE_MODEL: ${GEMINI_IMAGE_MODEL:-gemini-3.1-flash-lite-image}
       IMAGE_GENERATION_TIMEOUT_SECONDS: ${IMAGE_GENERATION_TIMEOUT_SECONDS:-180}
       IMAGE_GENERATION_BATCH_CONCURRENCY: ${IMAGE_GENERATION_BATCH_CONCURRENCY:-2}
+      IMAGE_WORKER_TOKEN: ${IMAGE_WORKER_TOKEN:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
