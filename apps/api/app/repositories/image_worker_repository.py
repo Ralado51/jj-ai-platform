@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, lazyload
 
 from app.models.asset import Asset
 from app.models.image_generation_job import ImageGenerationJob
@@ -50,12 +50,13 @@ class ImageWorkerRepository:
     def claim_next_job(self, worker: ImageWorker) -> ImageGenerationJob | None:
         stmt = (
             select(ImageGenerationJob)
+            .options(lazyload(ImageGenerationJob.asset))
             .where(
                 ImageGenerationJob.status == "pending",
                 ImageGenerationJob.model == worker.model,
             )
             .order_by(ImageGenerationJob.created_at.asc())
-            .with_for_update(skip_locked=True)
+            .with_for_update(skip_locked=True, of=ImageGenerationJob)
             .limit(1)
         )
         job = self.db.scalar(stmt)
