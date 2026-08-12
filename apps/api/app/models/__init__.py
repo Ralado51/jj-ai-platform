@@ -12,6 +12,7 @@ from app.models.conversation import Conversation, ConversationMessage
 from app.models.document_chunk import DocumentChunk
 from app.models.enums import AssetType, ExecutionStatus, MemoryType, TaskType
 from app.models.execution import Execution
+from app.models.image_generation_job import ImageGenerationJob
 from app.models.memory import Memory
 from app.models.notification import Notification
 from app.models.notification_email_delivery import NotificationEmailDelivery
@@ -31,7 +32,7 @@ from app.models.workflow_health_history import WorkflowHealthHistory
 __all__ = [
     "Agent", "AgentExecution", "AgentMemory", "AgentWorkflow", "AICostBudget", "AICostRecommendation", "AIUsage", "Asset", "AssetType", "AuditLog", "Base",
     "BenchmarkResult", "BenchmarkRun", "Conversation", "ConversationMessage", "DocumentChunk",
-    "Execution", "ExecutionStatus", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
+    "Execution", "ExecutionStatus", "ImageGenerationJob", "Memory", "MemoryType", "Notification", "NotificationEmailDelivery",
     "NotificationPreference", "PlaygroundRun", "PlaygroundSession", "Project", "PromptEvaluation", "PromptTemplate", "ResourceFavorite", "ResourceRegistry", "ResourceVersion", "Task", "TaskType", "TimestampMixin",
     "UUIDPrimaryKeyMixin", "User", "UserRole", "WorkflowBenchmark", "WorkflowExecution", "WorkflowHealthHistory",
 ]
