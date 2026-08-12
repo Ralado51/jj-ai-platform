@@ -3,7 +3,7 @@ from __future__ import annotations
 import secrets
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import Settings, get_settings
