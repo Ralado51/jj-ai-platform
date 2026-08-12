@@ -34,7 +34,11 @@ def create_job(
     return service.create(owner_id=user.id, payload=payload)
 
 
-@router.post("/batch", response_model=ImageJobBatchResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/batch",
+    response_model=ImageJobBatchResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def create_batch(
     payload: ImageJobBatchCreate,
     service: ImageGenerationJobService = Depends(get_service),
@@ -51,11 +55,13 @@ def list_jobs(
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=100),
     service: ImageGenerationJobService = Depends(get_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+    user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
 ) -> list[ImageJobResponse]:
-    return service.repository.list(
+    return service.list(
         owner_id=user.id,
-        status=job_status,
+        status_filter=job_status,
         project_id=project_id,
         offset=offset,
         limit=limit,
@@ -66,7 +72,9 @@ def list_jobs(
 def get_job(
     job_id: UUID,
     service: ImageGenerationJobService = Depends(get_service),
-    user: User = Depends(require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)),
+    user: User = Depends(
+        require_roles(UserRole.ADMIN, UserRole.MEMBER, UserRole.VIEWER)
+    ),
 ) -> ImageJobResponse:
     return service.get(job_id=job_id, owner_id=user.id)
 
