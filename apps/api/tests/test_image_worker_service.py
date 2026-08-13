@@ -56,13 +56,13 @@ class FakeImageWorkerRepository:
         online_timeout_seconds: int = 90,
         max_active_jobs: int = 1,
     ):
-    if self.job.status != "pending":
-        return None
-
+        if self.job.status != "pending":
+            return None
+    
         self.job.status = "processing"
         self.job.worker_id = str(worker.id)
-    return self.job
-
+        return self.job
+        
     def get_claimed_job(self, job_id, worker_id):
         if (
             job_id == self.job.id
