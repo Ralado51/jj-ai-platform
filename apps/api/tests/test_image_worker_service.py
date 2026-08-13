@@ -49,7 +49,13 @@ class FakeImageWorkerRepository:
         worker.last_seen_at = datetime.now(timezone.utc)
         return worker
 
-    def claim_next_job(self, worker: ImageWorker):
+    def claim_next_job(
+        self,
+        worker: ImageWorker,
+        runtime_priority: tuple[str, ...] = (),
+        online_timeout_seconds: int = 90,
+        max_active_jobs: int = 1,
+    ):
         if self.job.status != "pending":
             return None
         self.job.status = "processing"
