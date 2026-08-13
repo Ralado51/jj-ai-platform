@@ -25,6 +25,24 @@ class ImageWorkerResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ImageWorkerManagementResponse(ImageWorkerResponse):
+    effective_status: str
+    is_online: bool
+    active_jobs: int = 0
+    completed_jobs: int = 0
+    failed_jobs: int = 0
+
+
+class ImageWorkerManagementSummary(BaseModel):
+    total_workers: int
+    online_workers: int
+    offline_workers: int
+    active_jobs: int
+    completed_jobs: int
+    failed_jobs: int
+    workers: list[ImageWorkerManagementResponse]
+
+
 class ImageWorkerHeartbeatRequest(BaseModel):
     worker_id: UUID
 
@@ -49,7 +67,7 @@ class ImageWorkerResultRequest(BaseModel):
     worker_id: UUID
     image_base64: str = Field(min_length=1)
     mime_type: str = Field(default="image/png", max_length=150)
-    seed: int | None = Field(default=None, ge=0)
+    seed: int | None = Field(default=None, ge=0, le=2_147_483_647)
 
 
 class ImageWorkerFailedRequest(BaseModel):
