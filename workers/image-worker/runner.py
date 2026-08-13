@@ -23,6 +23,7 @@ INFERENCE_STEPS = int(os.getenv("JJ_IMAGE_STEPS", "28"))
 GUIDANCE_SCALE = float(os.getenv("JJ_IMAGE_GUIDANCE_SCALE", "7.5"))
 HTTP_TIMEOUT = float(os.getenv("JJ_WORKER_HTTP_TIMEOUT", "60"))
 HF_TOKEN = os.getenv("HF_TOKEN") or None
+MAX_DB_SEED = 2_147_483_647
 
 
 class JJImageWorker:
@@ -121,7 +122,12 @@ class JJImageWorker:
         assert self.torch is not None
 
         requested_seed = job.get("seed")
-        seed = int(requested_seed) if requested_seed is not None else int.from_bytes(os.urandom(4), "big")
+        if requested_seed is not None:
+            seed = int(requested_seed)
+            if seed < 0 or seed > MAX_DB_SEED:
+                raise ValueError(f"seed must be between 0 and {MAX_DB_SEED}")
+        else:
+            seed = int.from_bytes(os.urandom(4), "big") & MAX_DB_SEED
         generator = self.torch.Generator(device="cuda").manual_seed(seed)
 
         width = int(job["width"])
