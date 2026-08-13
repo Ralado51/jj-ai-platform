@@ -77,6 +77,9 @@ class Settings(BaseSettings):
     image_generation_timeout_seconds: float = 180.0
     image_generation_batch_concurrency: int = 2
     image_worker_token: str = ""
+    image_worker_runtime_priority: str = "kaggle,lightning,modal"
+    image_worker_online_timeout_seconds: int = 90
+    image_worker_max_active_jobs: int = 1
 
     model_config = SettingsConfigDict(
         env_file=".env",
